@@ -1,15 +1,19 @@
 name: Release
 
-# Publishes to npm when a version tag is pushed:
+# Stages a release on npm when a version tag is pushed:
 #
 #   npm version patch      (bumps package.json, commits, tags v1.0.1)
 #   git push origin main --follow-tags
 #
+# The maintainer approves the run on GitHub (the "npm" environment asks), and
+# then the staged version under Staged Packages on npmjs.com, with 2FA. Only
+# then does it go live.
+#
 # There is no npm token anywhere. npm trusts this workflow file, in this
 # repository, running in the "npm" environment - and nothing else (trusted
-# publishing, over OIDC) - and records which commit each version was built
-# from (provenance). Give the environment a required reviewer, and a release
-# waits for that person's approval before it can publish.
+# publishing, over OIDC) - and lets it stage, never publish. So whoever can
+# push a tag here still cannot put a version in front of users without the
+# maintainer's 2FA on npm. The environment only runs from v* tags.
 
 on:
   push:
@@ -34,8 +38,8 @@ jobs:
       - run: npm run check
 
   # Kept apart from the checks: only this job can ask for the token that
-  # publishes, and it runs nothing of the package's own.
-  publish:
+  # stages, and it runs nothing of the package's own.
+  stage:
     needs: check
     runs-on: ubuntu-latest
     environment: npm
@@ -51,4 +55,5 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - run: npm publish --ignore-scripts
+      # staging needs npm 11.15 or later, newer than Node 24 may bring
+      - run: npx --yes npm@11.21.1 stage publish --ignore-scripts
