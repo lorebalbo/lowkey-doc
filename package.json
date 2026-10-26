@@ -1,0 +1,46 @@
+{
+  "name": "lowkey-doc",
+  "version": "1.0.0",
+  "description": "Render a folder of Markdown into one self-contained documentation dashboard, with flowcharts and ER diagrams that stay readable when they get dense.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lorebalbo/lowkey-doc.git"
+  },
+  "homepage": "https://github.com/lorebalbo/lowkey-doc#readme",
+  "bugs": {
+    "url": "https://github.com/lorebalbo/lowkey-doc/issues"
+  },
+  "type": "module",
+  "bin": {
+    "lowkey-doc": "bin/lowkey-doc.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "commands",
+    "licenses",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node bin/lowkey-doc.mjs",
+    "build": "node bin/lowkey-doc.mjs --no-open",
+    "check": "node test/smoke.mjs"
+  },
+  "keywords": [
+    "documentation",
+    "markdown",
+    "mermaid",
+    "elk",
+    "flowchart",
+    "er-diagram",
+    "static-site",
+    "offline"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}

@@ -1,0 +1,11 @@
+# Lowkey Doc has no npm dependencies; the workflows' actions are all there is
+# to keep current. They are pinned by commit, and a release is only proposed
+# once it has been out for two weeks.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14

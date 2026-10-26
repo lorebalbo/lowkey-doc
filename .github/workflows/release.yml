@@ -1,0 +1,54 @@
+name: Release
+
+# Publishes to npm when a version tag is pushed:
+#
+#   npm version patch      (bumps package.json, commits, tags v1.0.1)
+#   git push origin main --follow-tags
+#
+# There is no npm token anywhere. npm trusts this workflow file, in this
+# repository, running in the "npm" environment - and nothing else (trusted
+# publishing, over OIDC) - and records which commit each version was built
+# from (provenance). Give the environment a required reviewer, and a release
+# waits for that person's approval before it can publish.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: The tag names the version in package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: npm run check
+
+  # Kept apart from the checks: only this job can ask for the token that
+  # publishes, and it runs nothing of the package's own.
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm publish --ignore-scripts
