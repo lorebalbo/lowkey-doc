@@ -24,7 +24,7 @@ export const CLI = process.env.npm_command === 'exec' ? 'npx lowkey-doc' : 'lowk
 
 const DEFAULTS = {
   // Shown in the sidebar, the browser tab, and used to namespace the
-  // per-reader state (which document was open, folded sections, comments).
+  // per-reader state (which document was open, folded sections, comments, reviews).
   title: null,                       // null -> derived from the project folder
   // Where the documents are, relative to the project root.
   docs: 'docs',
@@ -68,6 +68,7 @@ const DEFAULTS = {
   },
   // Reader features. Turn off what a given project does not want.
   comments: true,
+  reviews: true,
   search: true,
 };
 

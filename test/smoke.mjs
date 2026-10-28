@@ -102,6 +102,15 @@ ok(tight.subtitle === '<p>The lede.</p>' && tight.html.includes('<hr>'), 'a rule
 ok(lede('# L\n\nSome *italic\nacross a break* here.\n').html.includes('<em>italic\nacross a break</em>'),
   'italics may run across a line break');
 
+// reviews: every section carries its button, and the page gets the outline the marks roll up through
+const nested = lede('# L\n\n## A\n\n### A1\n\n### A2\n\n## B\n');
+ok(JSON.stringify(nested.outline) === '[{"id":"a","kids":[{"id":"a1","kids":[]},{"id":"a2","kids":[]}]},{"id":"b","kids":[]}]',
+  'the outline of the sections went into the document - got ' + JSON.stringify(nested.outline));
+ok((nested.html.match(/<button class="rv"/g) || []).length === 4, 'every section heading has a Reviewed button');
+const noReviews = buildDoc({ file: 'L.md', rel: 'L.md', group: '' }, new Map([['L.md', 'l']]), { ...cfg, reviews: false }, '# L\n\n## A\n');
+ok(!noReviews.html.includes('class="rv"'), '"reviews": false leaves the buttons out');
+ok(html.includes('"reviews":true'), 'the page is told reviews are on');
+
 ok(html.includes('vendor/mermaid.min.js') || html.includes('cdn.jsdelivr'), 'mermaid is referenced');
 ok(html.includes('__LOWKEY_DOC__'), 'the runtime config is in the page');
 ok(html.includes('Smoke Docs'), 'the title reached the page');

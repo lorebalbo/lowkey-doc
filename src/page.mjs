@@ -17,6 +17,7 @@ export function renderPage({ cfg, docs, fontCss, mermaidTag, elkTag }) {
     nodeTextWidth: cfg.diagrams.nodeTextWidth,
     edgeTextWidth: cfg.diagrams.edgeTextWidth,
     comments: cfg.comments !== false,
+    reviews: cfg.reviews !== false,
     margin: cfg.layout.margin,
   };
   // fixed margins are set on the root, so the page is laid out right from its first paint

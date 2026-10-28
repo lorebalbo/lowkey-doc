@@ -9,6 +9,8 @@ html{-webkit-text-size-adjust:100%}
   --line-2:rgba(255,255,255,.16); --surface:#13161b; --surface-2:#1a1e24; --hover:rgba(255,255,255,.05);
   /* the one accent: an electric blue, used for what is lit, current or alive */
   --accent:#4da3ff; --accent-soft:rgba(77,163,255,.12); --accent-ring:rgba(77,163,255,.36);
+  /* reviewed: a green as light and as cool as the blue, so the two sit together */
+  --ok:#45cf98; --ok-soft:rgba(69,207,152,.12); --ok-ring:rgba(69,207,152,.36);
   /* a filled button is white with dark text */
   --on-ink:#0b0d10; --ink-hover:#dde2e8;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -153,9 +155,14 @@ a{color:inherit;text-decoration:none}
 .sub-n{flex:none;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
 .sub.current .sub-n{color:var(--muted)}
 .sub-t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* a reviewed document or section carries a green check in the sidebar */
+.rv-mark{display:none;flex:none;width:13px;height:13px;color:var(--ok)}
+.rv-mark svg{display:block;width:100%;height:100%}
+.is-reviewed>.rv-mark{display:block}
+.sub .rv-mark{align-self:center;width:12px;height:12px}
 
 .collapsed .brand-name,.collapsed .search,.collapsed .nav-group,
-.collapsed .item-title,.collapsed .caret,.collapsed .foot-lbl{display:none}
+.collapsed .item-title,.collapsed .caret,.collapsed .foot-lbl,.collapsed .rv-mark{display:none}
 .collapsed .subs,.collapsed .item.open+.subs{display:none}
 .collapsed .side-top{padding:16px 0 12px}
 .collapsed .brand-row{justify-content:center}
@@ -313,6 +320,32 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
   opacity:0;transition:opacity .15s,color .15s}
 .sec-head:hover .h-anchor{opacity:1}
 .h-anchor:hover{color:var(--ink)}
+
+/* ---- reviews ----
+   Every section, and the document in its header card, has a Reviewed button:
+   a grey check until the reader marks it, then green. On a heading the word
+   shows only on hover, so a page of unread headings is not a page of labels. */
+.rv{flex:none;align-self:center;margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+  padding:3px 4px 3px 9px;border:1px solid transparent;border-radius:999px;background:none;
+  color:var(--faint);font:inherit;font-size:11.5px;font-weight:var(--semi);letter-spacing:0;line-height:1;
+  cursor:pointer;transition:color .15s,background .15s,border-color .15s}
+.rv svg{width:16px;height:16px;flex:none}
+.rv svg circle{transition:fill .15s,stroke .15s}
+.rv::before{content:"Reviewed";opacity:0;transition:opacity .15s}
+.sec-head:hover>.rv::before,.rv:focus-visible::before,.rv.is-on::before{opacity:1}
+.rv:hover{color:var(--ink);background:var(--hover)}
+.rv:focus-visible{outline:2px solid var(--ok-ring);outline-offset:1px}
+.rv.is-on{color:var(--ok)}
+.rv.is-on svg circle{fill:var(--ok);stroke:var(--ok)}
+.rv.is-on svg path{stroke:var(--on-ink)}
+.rv.is-on:hover{color:var(--ok);background:var(--ok-soft)}
+/* the document's own, in the corner of the header card: always labelled */
+.rv-bar{position:absolute;top:18px;right:18px;display:flex;align-items:center;gap:10px}
+.rv-count{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rv-count:empty{display:none}
+.rv-doc{margin:0;border-color:var(--line-2);color:var(--muted)}
+.rv-doc::before{opacity:1}
+.rv-doc.is-on{border-color:var(--ok-ring)}
 
 /* ---- prose ---- */
 .doc p{margin:0 0 18px}
@@ -493,6 +526,7 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
   .docnav-btn.next{grid-column:1;text-align:left}
   .head{width:calc(100% - 20px);margin-top:14px;padding-block:34px 36px}
   .head h1{font-size:29px}
+  .rv-bar{position:static;margin-top:18px}
 }
 /* Not enough room beside the column to hang the arrow and the number in:
    bring them back into the heading row rather than let them fall off-screen. */
@@ -503,7 +537,7 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
 @media print{
   .side{display:none}.layout{grid-template-columns:1fr}
   .head{border:0;border-radius:0;padding-block:20px;background:none}.head::before,.head::after{display:none}
-  .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor{display:none}
+  .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor,.rv,.rv-bar{display:none}
 }
 `;
 

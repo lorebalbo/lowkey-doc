@@ -34,6 +34,7 @@ export const APP_JS = String.raw`
   }
 
   var CARET = '<svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 4l4 4-4 4"/></svg>';
+  var CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/><path d="M5.3 8.2l1.9 1.9 3.6-3.9"/></svg>';
 
   function buildNav(){
     var group = null;
@@ -47,6 +48,7 @@ export const APP_JS = String.raw`
       item.title = d.file;
       item.appendChild(el('span', 'num', d.badge));
       item.appendChild(el('span', 'item-title', d.title));
+      if (RV_ON) item.insertAdjacentHTML('beforeend', '<span class="rv-mark" title="Reviewed">' + CHECK + '</span>');
       if (d.sections.length) item.insertAdjacentHTML('beforeend', CARET);
       item.addEventListener('click', function(e){
         if (e.target.closest('.caret') && current === d.id){ item.classList.toggle('open'); return; }
@@ -62,6 +64,8 @@ export const APP_JS = String.raw`
         a.title = (s.num ? s.num + '  ' : '') + s.text;
         if (s.num) a.appendChild(el('span', 'sub-n', s.num));
         a.appendChild(el('span', 'sub-t', s.text));
+        if (RV_ON) a.insertAdjacentHTML('beforeend', '<span class="rv-mark" title="Reviewed">' + CHECK + '</span>');
+        a.dataset.sec = s.id;
         subs.appendChild(a);
       });
       nav.appendChild(subs);
@@ -106,6 +110,7 @@ export const APP_JS = String.raw`
       restoreFolds(main);
       if (window.__diagrams) window.__diagrams.drawAll(main);
       renderComments();
+      paintReviews();
       watch();
     }
     if (anchor && reveal(anchor, false)) return;
@@ -133,6 +138,12 @@ export const APP_JS = String.raw`
       var lede = el('div', 'lede');
       lede.innerHTML = d.subtitle;
       head.appendChild(lede);
+    }
+    if (RV_ON){
+      var rvBar = el('div', 'rv-bar');
+      rvBar.appendChild(el('span', 'rv-count'));
+      rvBar.insertAdjacentHTML('beforeend', '<button class="rv rv-doc" type="button" aria-pressed="false" aria-label="Reviewed">' + CHECK + '</button>');
+      head.appendChild(rvBar);
     }
     wrap.appendChild(head);
 
@@ -199,6 +210,98 @@ export const APP_JS = String.raw`
     t.scrollIntoView(smooth ? { behavior: 'smooth' } : undefined);
     requestAnimationFrame(sync);   // at the foot of the page nothing scrolls, so no scroll event would
     return true;
+  }
+
+  /* ---------------- reviews ----------------
+     A reader marks what they have read and agree with. The mark is kept on the
+     smallest sections only: a section with sections under it is reviewed when
+     every one of them is, and the document when all of its sections are. So
+     marking a document or a chapter marks everything in it, reviewing the last
+     open section of a chapter completes the chapter, and a section written
+     later opens its chapter and its document again until it is read too.
+     Like comments, the marks live in this browser and nowhere else. */
+
+  var RV_ON = CFG.reviews !== false;
+  var reviewed = {};
+  try {
+    var rvSaved = JSON.parse(recall('reviewed') || '{}');
+    if (rvSaved && rvSaved.docs && typeof rvSaved.docs === 'object') reviewed = rvSaved.docs;
+  } catch (e) { reviewed = {}; }
+
+  function findSec(list, id){
+    for (var i = 0; i < list.length; i++){
+      if (list[i].id === id) return list[i];
+      var hit = findSec(list[i].kids, id);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  // what a review of the document (id null) or of one section stands for: the
+  // smallest sections under it, or the document itself if it has no sections
+  function rvKeys(d, id){
+    var outline = d.outline || [];
+    var node = id ? findSec(outline, id) : { kids: outline };
+    if (!node) return [];
+    if (!node.kids.length) return [id || ''];
+    var out = [];
+    (function walk(list){
+      list.forEach(function(k){ if (k.kids.length) walk(k.kids); else out.push(k.id); });
+    })(node.kids);
+    return out;
+  }
+
+  function rvCount(d, id){
+    var mine = reviewed[d.id] || {}, keys = rvKeys(d, id);
+    return { done: keys.filter(function(k){ return mine[k]; }).length, of: keys.length };
+  }
+  function isReviewed(d, id){ var c = rvCount(d, id); return c.of > 0 && c.done === c.of; }
+
+  function setReviewed(d, id, on){
+    var mine = reviewed[d.id] || {}, now = Date.now();
+    rvKeys(d, id).forEach(function(k){ if (on) mine[k] = mine[k] || now; else delete mine[k]; });
+    if (Object.keys(mine).length) reviewed[d.id] = mine; else delete reviewed[d.id];
+    keep('reviewed', JSON.stringify({ version: 1, docs: reviewed }));
+    paintReviews();
+  }
+
+  function paintBtn(btn, on, what){
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'Reviewed. Click to open ' + what + ' again' : 'Mark ' + what + ' as reviewed';
+  }
+
+  function paintReviews(){
+    if (!RV_ON) return;
+    nav.querySelectorAll('.item').forEach(function(item){
+      var d = byId[item.dataset.doc];
+      if (!d) return;
+      item.classList.toggle('is-reviewed', isReviewed(d, null));
+      var subs = nav.querySelector('[data-subs="' + d.id + '"]');
+      if (subs) subs.querySelectorAll('.sub').forEach(function(a){
+        a.classList.toggle('is-reviewed', isReviewed(d, a.dataset.sec));
+      });
+    });
+    var d = byId[current];
+    if (!d) return;
+    main.querySelectorAll('.sec').forEach(function(sec){
+      var btn = sec.querySelector(':scope > .sec-head > .rv');
+      if (btn) paintBtn(btn, isReviewed(d, sec.dataset.sec), 'this section');
+    });
+    var whole = main.querySelector('.rv-doc'), count = main.querySelector('.rv-count');
+    if (whole) paintBtn(whole, isReviewed(d, null), 'the whole document');
+    if (count){
+      var c = rvCount(d, null);
+      count.textContent = c.done && c.done < c.of ? c.done + ' of ' + c.of + ' sections' : '';
+    }
+  }
+
+  function toggleReview(btn){
+    var d = byId[current];
+    if (!d) return;
+    var sec = btn.classList.contains('rv-doc') ? null : btn.closest('.sec');
+    var id = sec ? sec.dataset.sec : null;
+    setReviewed(d, id, !isReviewed(d, id));
   }
 
   /* ---------------- lightbox ---------------- */
@@ -293,6 +396,8 @@ export const APP_JS = String.raw`
       if (reveal(href.slice(1), true)) history.replaceState(null, '', '#/' + current + '/' + href.slice(1));
       return;
     }
+    var rv = e.target.closest('.rv');
+    if (rv){ toggleReview(rv); return; }
     // anywhere on a heading folds its section - unless the click was really the
     // end of a drag that selected some of it
     var head = e.target.closest('.sec-head');
@@ -901,6 +1006,7 @@ export const APP_JS = String.raw`
       n.classList.toggle('open', !!open[n.dataset.doc] || n.dataset.doc === current);
     });
     if (search && search.value) search.dispatchEvent(new Event('input'));
+    paintReviews();
     nav.scrollTop = top;
   }
 
@@ -920,6 +1026,7 @@ export const APP_JS = String.raw`
     restoreFolds(main);
     if (window.__diagrams) window.__diagrams.drawAll(main);
     renderComments();
+    paintReviews();
     watch();
     keepPlace(at);
 

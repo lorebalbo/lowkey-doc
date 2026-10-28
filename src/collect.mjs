@@ -93,7 +93,7 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
   const id = byFile.get(entry.file);
   const seen = new Map();
   const ctx = {
-    blocks: [], headings: [], byFile, numbers: new Map(),
+    blocks: [], headings: [], byFile, numbers: new Map(), outline: [], reviews: cfg.reviews !== false,
     uniqueSlug(base) {
       const key = base || 'section';
       const n = seen.get(key) || 0;
@@ -135,6 +135,7 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
 
   return {
     id, title, subtitle, html, badge,
+    outline: ctx.outline,
     group: entry.group,
     file: entry.rel || entry.file,
     words: raw.split(/\s+/).filter(Boolean).length,

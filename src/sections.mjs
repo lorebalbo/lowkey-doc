@@ -8,6 +8,12 @@
 
 const FOLD_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 6L8 10.5 12.5 6"/></svg>';
+const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/>' +
+  '<path d="M5.3 8.2l1.9 1.9 3.6-3.9"/></svg>';
+// The word on the button is drawn by CSS, so it is never part of the heading's
+// text: not copied with it, not matched by search, not quoted by a comment.
+const REVIEW_BTN = '<button class="rv" type="button" aria-pressed="false" aria-label="Reviewed">' + CHECK_SVG + '</button>';
 
 const HEAD_RE = /^<h([1-6]) id="([^"]+)">([\s\S]*)<\/h[1-6]>$/;
 const ANCHOR_RE = /^<a class="h-anchor"[^>]*>#<\/a>/;
@@ -30,6 +36,11 @@ export function nestSections(blocks, ctx) {
     stack[stack.length - 1].kids.push(node);
     stack.push(node);
   }
+  // the shape of the sections alone, which the page needs for reviews without
+  // having to read it back out of the HTML
+  const outline = (node) => node.kids.filter((k) => typeof k !== 'string')
+    .map((k) => ({ id: k.id, kids: outline(k) }));
+  ctx.outline = outline(root);
   return emitSections(root, [], ctx);
 }
 
@@ -55,7 +66,7 @@ function emitSections(node, prefix, ctx) {
         '<button class="sec-tog" type="button" tabindex="-1" aria-label="Fold section">' + FOLD_SVG + '</button>' +
         '<span class="sec-num">' + label + '</span>' +
       '</span>' +
-      '<span class="sec-txt">' + text + '</span>' + anchor +
+      '<span class="sec-txt">' + text + '</span>' + anchor + (ctx.reviews ? REVIEW_BTN : '') +
       '</h' + kid.level + '>';
     return '<section class="sec" data-sec="' + kid.id + '">' + head +
       '<div class="sec-body">' + emitSections(kid, num, ctx) + '</div></section>';
