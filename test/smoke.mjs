@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.mjs';
 import { build, collectDocs, pageFor } from '../src/build.mjs';
+import { buildDoc } from '../src/collect.mjs';
 import { watch } from '../src/watch.mjs';
 import { init } from '../src/init.mjs';
 import { NOTICES_FILE } from '../src/vendor.mjs';
@@ -88,6 +89,18 @@ ok(r.docs[0].html.includes('href="#/10-tenth/a-heading"'), 'a cross-document lin
 ok(r.docs[0].html.includes('<table>'), 'the table rendered');
 ok(!r.docs[0].html.includes('must not render'), 'the HTML comment was stripped');
 ok(r.docs[0].html.includes('<section class="sec"'), 'headings own their sections');
+
+// the whole blockquote under the title is the standfirst, however many paragraphs it has
+const lede = (md) => buildDoc({ file: 'L.md', rel: 'L.md', group: '' }, new Map([['L.md', 'l']]), cfg, md);
+const multi = lede('# L\n\n> First paragraph.\n>\n> Second, **bold**.\n\n---\n\n> A quote in the body.\n');
+ok(multi.subtitle.includes('First paragraph.') && multi.subtitle.includes('Second, <strong>bold</strong>.'),
+  'every paragraph of the blockquote under the title went into the standfirst');
+ok(!multi.html.includes('Second,') && (multi.html.match(/<blockquote>/g) || []).length === 1,
+  'none of it is left in the body, and a later blockquote stays where it is');
+const tight = lede('# L\n\n> The lede.\n---\n\nBody.\n');
+ok(tight.subtitle === '<p>The lede.</p>' && tight.html.includes('<hr>'), 'a rule right under the lede is not swallowed by it');
+ok(lede('# L\n\nSome *italic\nacross a break* here.\n').html.includes('<em>italic\nacross a break</em>'),
+  'italics may run across a line break');
 
 ok(html.includes('vendor/mermaid.min.js') || html.includes('cdn.jsdelivr'), 'mermaid is referenced');
 ok(html.includes('__LOWKEY_DOC__'), 'the runtime config is in the page');

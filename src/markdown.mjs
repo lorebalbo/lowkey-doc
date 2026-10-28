@@ -303,8 +303,9 @@ export function inline(src, ctx) {
   s = s.replace(/~~([\s\S]+?)~~/g, '<del>$1</del>');
   s = s.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^\w])__(\S[\s\S]*?\S|\S)__(?!\w)/g, '$1<strong>$2</strong>');
-  s = s.replace(/(^|[^*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?!\*)/g, '$1<em>$2</em>');
-  s = s.replace(/(^|[^\w\\])_(?!\s)([^_\n]+?)(?<!\s)_(?!\w)/g, '$1<em>$2</em>');
+  // like strong, emphasis may run across a line break, never across a blank line
+  s = s.replace(/(^|[^*])\*(?!\s)((?:[^*\n]|\n(?!\n))+?)(?<!\s)\*(?!\*)/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[^\w\\])_(?!\s)((?:[^_\n]|\n(?!\n))+?)(?<!\s)_(?!\w)/g, '$1<em>$2</em>');
 
   // 6. bare urls left in plain text
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:])/g,
@@ -359,6 +360,23 @@ const isDelim = (line) => {
 };
 const listMark = (line) => line.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
 const indentOf = (line) => (line.match(/^\s*/) || [''])[0].length;
+const isRule = (line) => /^ {0,3}([-*_])(\s*\1){2,}\s*$/.test(line);
+const HEADING_RE = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
+
+// The blockquote that starts at lines[i]: its lines without their markers, and
+// the index just past it. A line with no marker still belongs to it when it
+// carries on the quote's last paragraph, unless it starts a block of its own.
+export function takeQuote(lines, i) {
+  const buf = [];
+  for (; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^ {0,3}>/.test(line)) buf.push(line.replace(/^ {0,3}> ?/, ''));
+    else if (buf.length && buf[buf.length - 1].trim() && line.trim() &&
+             !listMark(line) && !isRule(line) && !HEADING_RE.test(line) && !BLOCK_RE.test(line)) buf.push(line);
+    else break;
+  }
+  return { buf, end: i };
+}
 
 export function renderBlocks(lines, ctx, asArray) {
   const out = [];
@@ -380,7 +398,7 @@ export function renderBlocks(lines, ctx, asArray) {
     const park = line.match(BLOCK_RE);
     if (park) { flush(); out.push(ctx.blocks[+park[1]]); i++; continue; }
 
-    const head = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    const head = line.match(HEADING_RE);
     if (head) {
       flush();
       const level = head[1].length;
@@ -393,16 +411,13 @@ export function renderBlocks(lines, ctx, asArray) {
       i++; continue;
     }
 
-    if (/^ {0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out.push('<hr>'); i++; continue; }
+    if (isRule(line)) { flush(); out.push('<hr>'); i++; continue; }
 
     if (/^ {0,3}>/.test(line)) {
       flush();
-      const buf = [];
-      while (i < lines.length && (/^ {0,3}>/.test(lines[i]) || (buf.length && lines[i].trim() && !listMark(lines[i])))) {
-        buf.push(lines[i].replace(/^ {0,3}> ?/, ''));
-        i++;
-      }
-      out.push('<blockquote>' + renderBlocks(buf, ctx) + '</blockquote>');
+      const quote = takeQuote(lines, i);
+      out.push('<blockquote>' + renderBlocks(quote.buf, ctx) + '</blockquote>');
+      i = quote.end;
       continue;
     }
 

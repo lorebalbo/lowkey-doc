@@ -12,7 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { esc, plain, slugify, inline, parkFences, renderBlocks } from './markdown.mjs';
+import { esc, plain, slugify, parkFences, renderBlocks, takeQuote } from './markdown.mjs';
 import { nestSections, SECNUM_RE } from './sections.mjs';
 import { titleCase } from './config.mjs';
 
@@ -114,23 +114,19 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
       lines.splice(h1, 1);
     }
 
-    // the lede paragraph of the blockquote under it becomes the subtitle
+    // the blockquote under it - all of it, every paragraph - becomes the subtitle
     let j = 0;
     while (j < lines.length && !lines[j].trim()) j++;
     if (j < lines.length && /^ {0,3}>/.test(lines[j])) {
-      const lede = [];
-      while (j < lines.length && /^ {0,3}>/.test(lines[j]) && lines[j].replace(/^ {0,3}> ?/, '').trim()) {
-        lede.push(lines[j].replace(/^ {0,3}> ?/, '').trim());
-        j++;
-      }
-      subtitle = inline(lede.join(' '), ctx);
-      lines.splice(0, j);
+      const lede = takeQuote(lines, j);
+      subtitle = renderBlocks(lede.buf, ctx);
+      lines.splice(0, lede.end);
     }
 
     html = nestSections(renderBlocks(lines, ctx, true), ctx);
   } else {
     const kind = extOf(entry.file).slice(1);
-    subtitle = 'Kept verbatim as <code>' + esc(kind) + '</code>.';
+    subtitle = '<p>Kept verbatim as <code>' + esc(kind) + '</code>.</p>';
     html = '<div class="code-wrap"><span class="code-lang">' + esc(kind) +
       '</span><pre class="code"><code>' + esc(raw) + '</code></pre></div>';
   }

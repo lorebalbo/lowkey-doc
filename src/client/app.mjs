@@ -130,9 +130,9 @@ export const APP_JS = String.raw`
     var head = el('header', 'head');
     head.appendChild(el('h1', null, d.title));
     if (d.subtitle){
-      var p = el('p');
-      p.innerHTML = d.subtitle;
-      head.appendChild(p);
+      var lede = el('div', 'lede');
+      lede.innerHTML = d.subtitle;
+      head.appendChild(lede);
     }
     wrap.appendChild(head);
 
@@ -938,7 +938,7 @@ export const APP_JS = String.raw`
     var out = [];
     var head = holder.querySelector('.head');
     if (was.title !== d.title) out.push(head.querySelector('h1'));
-    if (was.subtitle !== d.subtitle && head.querySelector('p')) out.push(head.querySelector('p'));
+    if (was.subtitle !== d.subtitle && head.querySelector('.lede')) out.push(head.querySelector('.lede'));
 
     var body = holder.querySelector('.doc');
     var t = document.createElement('template');

@@ -249,7 +249,9 @@ export const CSS_MAIN = `
 @keyframes head-lamp{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.head::before,.head::after{animation:none}}
 .head h1{margin:0;max-width:22ch;font-size:36px;line-height:1.12;font-weight:650;letter-spacing:-.034em;color:var(--ink)}
-.head p{margin:14px 0 0;max-width:68ch;font-size:15.5px;line-height:1.62;color:var(--muted)}
+.head .lede{margin:14px 0 0;max-width:68ch;font-size:15.5px;line-height:1.62;color:var(--muted)}
+.lede>*{margin:0}
+.lede>*+*{margin-top:10px}
 .doc{padding:4px var(--gutter) 30px;width:100%;max-width:var(--column);margin-inline:auto}
 
 /* ---- prev / next ----
@@ -323,9 +325,9 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
 .doc ul>li::marker{color:var(--accent)}
 .doc strong{font-weight:var(--semi);color:inherit}
 .doc em{font-style:italic}
-.doc a:not(.h-anchor){color:var(--ink);border-bottom:1px solid var(--line-2);padding-bottom:1px;
+.doc a:not(.h-anchor),.lede a{color:var(--ink);border-bottom:1px solid var(--line-2);padding-bottom:1px;
   transition:border-color .12s,color .12s}
-.doc a:not(.h-anchor):hover{border-bottom-color:var(--accent);color:var(--accent)}
+.doc a:not(.h-anchor):hover,.lede a:hover{border-bottom-color:var(--accent);color:var(--accent)}
 .doc hr{margin:32px 0;border:0;border-top:1px solid var(--line)}
 .doc blockquote{margin:0 0 18px;padding:2px 0 2px 17px;border-left:2px solid var(--accent-ring);color:var(--muted)}
 /* Inline code is a plate set into the sentence: a faint white fill that
@@ -334,12 +336,12 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
    alone would vanish), and an ink a shade cooler than the prose, so a name
    reads as a name without shouting. Padding is in em, so the plate tracks
    the text it sits in, headings included. */
-.doc code{font-family:var(--mono);font-size:.84em;letter-spacing:-.01em;
+.doc code,.lede code{font-family:var(--mono);font-size:.84em;letter-spacing:-.01em;
   background:var(--code-bg);box-shadow:inset 0 0 0 1px var(--code-ring);
   border-radius:5px;padding:.1em .38em .12em;color:var(--code-ink);white-space:nowrap;
   -webkit-box-decoration-break:clone;box-decoration-break:clone}
 .api code{background:var(--code-bg-on-white)}
-.doc a:not(.h-anchor) code{color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-ring)}
+.doc a:not(.h-anchor) code,.lede a code{color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-ring)}
 .doc h1 code,.doc h2 code,.doc h3 code,.doc h4 code{font-size:.86em;font-weight:var(--semi)}
 /* a {placeholder} inside code: the braces fade, the name stays */
 .c-var{color:var(--code-var);font-style:italic}
