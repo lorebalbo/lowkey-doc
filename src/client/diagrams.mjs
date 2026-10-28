@@ -800,11 +800,92 @@ export const DIAGRAMS_JS = String.raw`
     return out;
   }
 
-  function shapeEl(x, y, w, h, shape){
+  // the corners of the shapes that are drawn as polygons, null for the rest
+  function polyPoints(x, y, w, h, shape){
     var s;
     switch (shape){
       case 'diamond': case 'question': case 'rhombus':
-        return mk('polygon', { points: (x+w/2)+','+y+' '+(x+w)+','+(y+h/2)+' '+(x+w/2)+','+(y+h)+' '+x+','+(y+h/2) });
+        return [[x+w/2,y], [x+w,y+h/2], [x+w/2,y+h], [x,y+h/2]];
+      case 'hexagon':
+        s = Math.min(18, w/5);
+        return [[x+s,y], [x+w-s,y], [x+w,y+h/2], [x+w-s,y+h], [x+s,y+h], [x,y+h/2]];
+      case 'lean_right': case 'lean_r':
+        s = Math.min(22, w/6);
+        return [[x+s,y], [x+w,y], [x+w-s,y+h], [x,y+h]];
+      case 'lean_left': case 'lean_l':
+        s = Math.min(22, w/6);
+        return [[x,y], [x+w-s,y], [x+w,y+h], [x+s,y+h]];
+      case 'trapezoid':
+        s = Math.min(22, w/6);
+        return [[x+s,y], [x+w-s,y], [x+w,y+h], [x,y+h]];
+      case 'inv_trapezoid':
+        s = Math.min(22, w/6);
+        return [[x,y], [x+w,y], [x+w-s,y+h], [x+s,y+h]];
+    }
+    return null;
+  }
+
+  // The outline shapeEl draws, as a closed ring of points, its curves walked
+  // in short steps.
+  function outline(x, y, w, h, shape){
+    var poly = polyPoints(x, y, w, h, shape);
+    if (poly) return poly.map(function(p){ return { x:p[0], y:p[1] }; });
+    var ring = [];
+    var arc = function(cx, cy, rx, ry, a0, a1){
+      var n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / (Math.PI/24)));
+      for (var i=0;i<=n;i++){
+        var t = a0 + (a1 - a0) * i/n;
+        ring.push({ x: cx + rx*Math.cos(t), y: cy + ry*Math.sin(t) });
+      }
+    };
+    var rounded = function(r){
+      r = Math.min(r, w/2, h/2);
+      arc(x+w-r, y+r, r, r, -Math.PI/2, 0);
+      arc(x+w-r, y+h-r, r, r, 0, Math.PI/2);
+      arc(x+r, y+h-r, r, r, Math.PI/2, Math.PI);
+      arc(x+r, y+r, r, r, Math.PI, Math.PI*1.5);
+    };
+    switch (shape){
+      case 'stadium': case 'pill': rounded(h/2); break;
+      case 'circle': case 'doublecircle': case 'state': arc(x+w/2, y+h/2, w/2, h/2, 0, Math.PI*2); break;
+      case 'cylinder': case 'database':
+        var e = Math.min(11, h/5);
+        arc(x+w/2, y+e, w/2, e, Math.PI, Math.PI*2);
+        arc(x+w/2, y+h-e, w/2, e, 0, Math.PI);
+        break;
+      case 'squareRect': case 'rect': case 'square': rounded(3); break;
+      default: rounded(8);
+    }
+    return ring;
+  }
+
+  // ELK knows a node only as its box, and ends every edge on the box. A shape
+  // that does not fill its box - a diamond most of all - would leave arrows
+  // stopping short in the air beside it, so each end is carried on, straight
+  // in across the side of the box it arrived at, until it meets the outline.
+  // The route is orthogonal, so that is the direction its last run already had.
+  function onOutline(p, a){
+    var ring = outline(a.x, a.y, a.w, a.h, a.n.shape);
+    var gap = [Math.abs(p.y - a.y), Math.abs(a.y + a.h - p.y), Math.abs(p.x - a.x), Math.abs(a.x + a.w - p.x)];
+    var side = gap.indexOf(Math.min.apply(null, gap));
+    var ux = [0, 0, 1, -1][side], uy = [1, -1, 0, 0][side];
+    // from just outside the box, the first crossing of the outline
+    var ox = p.x - ux*2, oy = p.y - uy*2, best = Infinity;
+    for (var i=0;i<ring.length;i++){
+      var q = ring[i], r = ring[(i+1) % ring.length];
+      var ex = r.x - q.x, ey = r.y - q.y, den = ux*ey - uy*ex;
+      if (Math.abs(den) < 1e-9) continue;
+      var qx = q.x - ox, qy = q.y - oy;
+      var t = (qx*ey - qy*ex) / den, s = (qx*uy - qy*ux) / den;
+      if (s >= -1e-6 && s <= 1 + 1e-6 && t >= 0 && t < best) best = t;
+    }
+    return best < Infinity ? { x: ox + ux*best, y: oy + uy*best } : p;
+  }
+
+  function shapeEl(x, y, w, h, shape){
+    var poly = polyPoints(x, y, w, h, shape);
+    if (poly) return mk('polygon', { points: poly.map(function(p){ return p[0]+','+p[1]; }).join(' ') });
+    switch (shape){
       case 'stadium': case 'pill':
         return mk('rect', { x:x, y:y, width:w, height:h, rx:h/2, ry:h/2 });
       case 'circle': case 'doublecircle': case 'state':
@@ -814,22 +895,6 @@ export const DIAGRAMS_JS = String.raw`
         return mk('path', { d:'M'+x+','+(y+e)+' A'+(w/2)+','+e+' 0 0 1 '+(x+w)+','+(y+e)+
           ' L'+(x+w)+','+(y+h-e)+' A'+(w/2)+','+e+' 0 0 1 '+x+','+(y+h-e)+' Z'+
           ' M'+x+','+(y+e)+' A'+(w/2)+','+e+' 0 0 0 '+(x+w)+','+(y+e) });
-      case 'hexagon':
-        s = Math.min(18, w/5);
-        return mk('polygon', { points:(x+s)+','+y+' '+(x+w-s)+','+y+' '+(x+w)+','+(y+h/2)+' '+
-          (x+w-s)+','+(y+h)+' '+(x+s)+','+(y+h)+' '+x+','+(y+h/2) });
-      case 'lean_right': case 'lean_r':
-        s = Math.min(22, w/6);
-        return mk('polygon', { points:(x+s)+','+y+' '+(x+w)+','+y+' '+(x+w-s)+','+(y+h)+' '+x+','+(y+h) });
-      case 'lean_left': case 'lean_l':
-        s = Math.min(22, w/6);
-        return mk('polygon', { points:x+','+y+' '+(x+w-s)+','+y+' '+(x+w)+','+(y+h)+' '+(x+s)+','+(y+h) });
-      case 'trapezoid':
-        s = Math.min(22, w/6);
-        return mk('polygon', { points:(x+s)+','+y+' '+(x+w-s)+','+y+' '+(x+w)+','+(y+h)+' '+x+','+(y+h) });
-      case 'inv_trapezoid':
-        s = Math.min(22, w/6);
-        return mk('polygon', { points:x+','+y+' '+(x+w)+','+y+' '+(x+w-s)+','+(y+h)+' '+(x+s)+','+(y+h) });
       case 'squareRect': case 'rect': case 'square':
         return mk('rect', { x:x, y:y, width:w, height:h, rx:3, ry:3 });
       default:
@@ -1020,20 +1085,44 @@ export const DIAGRAMS_JS = String.raw`
 
   // Right-angle bends look mechanical when they are exactly square; a small
   // radius reads as a route rather than as a staircase.
+  var BEND_R = 7;
+
+  // where the curve that rounds the bend at b starts and ends, or null if
+  // there is no room for one
+  function bendAt(a, b, c, r){
+    var l1=Math.hypot(b.x-a.x,b.y-a.y), l2=Math.hypot(c.x-b.x,c.y-b.y);
+    if (!l1 || !l2) return null;
+    var rr = Math.min(r, l1/2, l2/2);
+    return { from: { x: b.x+(a.x-b.x)/l1*rr, y: b.y+(a.y-b.y)/l1*rr },
+             to:   { x: b.x+(c.x-b.x)/l2*rr, y: b.y+(c.y-b.y)/l2*rr } };
+  }
+
   function roundedPath(pts, r){
     if (pts.length < 2) return '';
-    if (pts.length === 2) return 'M'+pts[0].x+','+pts[0].y+' L'+pts[1].x+','+pts[1].y;
     var d = 'M'+pts[0].x+','+pts[0].y;
     for (var i=1;i<pts.length-1;i++){
-      var a=pts[i-1], b=pts[i], c=pts[i+1];
-      var l1=Math.hypot(b.x-a.x,b.y-a.y), l2=Math.hypot(c.x-b.x,c.y-b.y);
-      if (!l1 || !l2){ d += ' L'+b.x+','+b.y; continue; }
-      var rr = Math.min(r, l1/2, l2/2);
-      d += ' L'+(b.x+(a.x-b.x)/l1*rr)+','+(b.y+(a.y-b.y)/l1*rr) +
-           ' Q'+b.x+','+b.y+' '+(b.x+(c.x-b.x)/l2*rr)+','+(b.y+(c.y-b.y)/l2*rr);
+      var b = pts[i], k = bendAt(pts[i-1], b, pts[i+1], r);
+      d += k ? ' L'+k.from.x+','+k.from.y+' Q'+b.x+','+b.y+' '+k.to.x+','+k.to.y : ' L'+b.x+','+b.y;
     }
     var e = pts[pts.length-1];
     return d + ' L'+e.x+','+e.y;
+  }
+
+  // The route as roundedPath draws it, its curves walked in short steps. A
+  // point found on this is on the line the reader sees; one found on the
+  // square corner it rounds off sits beside the line, in the air.
+  function roundedPts(pts, r){
+    var out = [pts[0]];
+    for (var i=1;i<pts.length-1;i++){
+      var b = pts[i], k = bendAt(pts[i-1], b, pts[i+1], r);
+      if (!k){ out.push(b); continue; }
+      for (var j=0;j<=8;j++){
+        var t = j/8, u = 1-t;
+        out.push({ x: u*u*k.from.x + 2*u*t*b.x + t*t*k.to.x, y: u*u*k.from.y + 2*u*t*b.y + t*t*k.to.y });
+      }
+    }
+    out.push(pts[pts.length-1]);
+    return out;
   }
 
   function nearestOnPath(pts, px, py){
@@ -1187,9 +1276,15 @@ export const DIAGRAMS_JS = String.raw`
         runs.push([sec.startPoint].concat(sec.bendPoints || [], [sec.endPoint]).map(shift));
       });
       if (!runs.length) return;
+      // both ends on the shape itself, not on the box ELK knows it by
+      if (!isEr){
+        var first = runs[0], last = runs[runs.length-1];
+        if (abs[src] && !abs[src].n.isGroup) first[0] = onOutline(first[0], abs[src]);
+        if (abs[dst] && !abs[dst].n.isGroup) last[last.length-1] = onOutline(last[last.length-1], abs[dst]);
+      }
 
       runs.forEach(function(pts, i){
-        var d = roundedPath(pts, 7);
+        var d = roundedPath(pts, BEND_R);
         g.appendChild(mk('path', { d:d, fill:'none' }, 'dg-edge-hit'));
         var line = mk('path', { d:d, fill:'none' }, 'dg-edge-line');
         if (info.pattern === 'dashed') line.style.strokeDasharray = '7 4';
@@ -1232,7 +1327,7 @@ export const DIAGRAMS_JS = String.raw`
         var cx = lb.x + o.x + lb.width/2, cy = lb.y + o.y + lb.height/2;
         var pw = info._lw || lb.width, ph = info._lh || lb.height;
         var lx = cx - pw/2, ly = cy - ph/2;
-        var anchor = pts.length > 1 ? nearestOnPath(pts, cx, cy) : null;
+        var anchor = pts.length > 1 ? nearestOnPath(roundedPts(pts, BEND_R), cx, cy) : null;
         if (anchor){
           var dx = anchor.x - cx, dy = anchor.y - cy;
           var hw = pw/2 + 3, hh = ph/2 + 3, ax = cx, ay = cy;
