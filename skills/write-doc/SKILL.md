@@ -1,6 +1,6 @@
 ---
 name: write-doc
-description: Write a new high-level product document for this project's documentation folder. Use when asked to document a feature, flow, or area for a non-technical reader — "write a doc about X", "document the checkout flow", "add a docs page for onboarding".
+description: Write a new high-level product document for this project's documentation folder, or change an existing one. Use when asked to document a feature, flow, or area for a non-technical reader — "write a doc about X", "document the checkout flow", "add a docs page for onboarding", "update the onboarding doc".
 ---
 
 # Writing a document
@@ -85,6 +85,28 @@ For an `erDiagram`, the entity is drawn as a table with the keys pinned to its r
 
 ## Appendix — implementation direction   (only if a decision must be recorded)
 ```
+
+## Changing what someone has reviewed
+
+Readers mark sections **Reviewed** on the dashboard, and the marks are kept in `docs.reviews.json`
+beside `docs.config.json`. A mark means a person read those words and agreed with them, so it must
+not outlive them. Before editing a document, look for its file name in `docs.reviews.json`:
+
+- **Every section whose words you change loses its mark: delete its line.** A section is keyed by
+  its heading's GitHub-style anchor (`## 2. Inviting somebody in` → `"2-inviting-somebody-in"`),
+  and `""` is the document's own words: the blockquote under the title and anything before the
+  first section.
+- **A mark covers only the words directly under its heading**, up to the next heading of any level.
+  Changing a sub-section removes the sub-section's line, not its chapter's; the chapter and the
+  document show as open on their own until the changed part is reviewed again.
+- **Renaming a heading or moving a section** changes its anchor: delete its old line as well.
+- Re-wrapping lines or changing only formatting leaves the words as they were: keep the mark.
+- **Never add or change a mark yourself.** Only a person reviews.
+- **Say which reviewed sections you changed** at the end of your reply, so the reviewer knows what
+  to read again.
+
+The dashboard would show a changed section as open anyway, since each mark carries a fingerprint
+of its words; deleting the line keeps the file honest in git as well.
 
 ## Filing
 
