@@ -9,7 +9,7 @@ import { MARGIN_MIN, MARGIN_MAX } from './config.mjs';
 const escAttr = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-export function renderPage({ cfg, docs, fontCss, mermaidTag, elkTag }) {
+export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTag }) {
   const runtime = {
     title: cfg.title,
     ns: cfg.ns,
@@ -24,7 +24,7 @@ export function renderPage({ cfg, docs, fontCss, mermaidTag, elkTag }) {
   const rootAttrs = cfg.layout.margin == null ? ''
     : ' class="fixed-margin" style="--margin:' + Number(cfg.layout.margin) + 'px"';
 
-  const data = JSON.stringify({ docs }).replace(/</g, '\\u003c');
+  const data = JSON.stringify({ docs, reviews: cfg.reviews === false ? {} : reviews }).replace(/</g, '\\u003c');
 
   // a script from the CDN carries its pinned hash: the browser refuses any other bytes
   const script = (tag) => !tag ? '' : '<script src="' + escAttr(tag.src) + '"' +
@@ -49,8 +49,7 @@ export function renderPage({ cfg, docs, fontCss, mermaidTag, elkTag }) {
 
   const commentBits = cfg.comments === false ? '' : `
 <button class="cmt-add" id="cmt-add" type="button" hidden>Comment</button>
-<div class="cmt-pop" id="cmt-pop" hidden></div>
-<div class="cmt-toast" id="cmt-toast" hidden></div>`;
+<div class="cmt-pop" id="cmt-pop" hidden></div>`;
 
   return `<!doctype html>
 <html lang="en"${rootAttrs}>
@@ -90,7 +89,8 @@ export function renderPage({ cfg, docs, fontCss, mermaidTag, elkTag }) {
     <div id="main"></div>
   </div>
 </div>
-${commentBits}
+${commentBits}${cfg.comments === false && cfg.reviews === false ? '' : `
+<div class="cmt-toast" id="cmt-toast" hidden></div>`}
 <div class="settings-veil" id="settings-veil" hidden></div>
 <div class="settings" id="settings" role="dialog" aria-modal="true" aria-label="Settings" hidden>
   <div class="settings-head">

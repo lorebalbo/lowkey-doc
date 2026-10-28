@@ -6,13 +6,15 @@ import { execFile } from 'node:child_process';
 import { listDocs, assignIds, buildDoc } from './collect.mjs';
 import { vendorMermaid, vendorElk, vendorFont, writeNotices } from './vendor.mjs';
 import { renderPage } from './page.mjs';
+import { readReviews } from './reviews.mjs';
 import { DEFAULTS, CLI, VERSION } from './config.mjs';
 
 export async function build(cfg, { open = true, refresh = false, quiet = false } = {}) {
   const { docs } = collectDocs(cfg);
 
   const assets = await vendorAssets(cfg, refresh);
-  const html = pageFor(cfg, docs, assets);
+  const marks = readReviews(cfg);
+  const html = pageFor(cfg, docs, assets, marks.reviews);
 
   const outFile = path.join(cfg.outDir, 'index.html');
   fs.writeFileSync(outFile, html);
@@ -22,6 +24,7 @@ export async function build(cfg, { open = true, refresh = false, quiet = false }
     docs,
     bytes: fs.statSync(outFile).size,
     notes: { mermaid: assets.mermaid.note, elk: assets.elk.note, font: assets.font.note },
+    reviews: marks.error,
   };
 
   if (!quiet) print(cfg, report);
@@ -97,9 +100,11 @@ export async function vendorAssets(cfg, refresh = false) {
   return assets;
 }
 
-export function pageFor(cfg, docs, assets) {
+// reviews: the marks read from docs.reviews.json. The watcher leaves them out
+// of the page it fingerprints as its shell, so saving one never reloads a page.
+export function pageFor(cfg, docs, assets, reviews = {}) {
   return renderPage({
-    cfg, docs,
+    cfg, docs, reviews,
     fontCss: assets.font.css,
     mermaidTag: assets.mermaid.tag,
     elkTag: assets.elk.tag,
@@ -117,6 +122,7 @@ function print(cfg, r) {
   console.log('  mermaid: ' + r.notes.mermaid);
   console.log('  elk:     ' + r.notes.elk);
   console.log('  font:    ' + r.notes.font);
+  if (r.reviews) console.log('  reviews: not shown - ' + r.reviews);
   console.log('  -> ' + r.outFile + '  (' + (r.bytes / 1024).toFixed(0) + ' KB)');
 }
 

@@ -10,6 +10,7 @@ import path from 'node:path';
 import { loadConfig } from '../src/config.mjs';
 import { build, collectDocs, pageFor } from '../src/build.mjs';
 import { buildDoc } from '../src/collect.mjs';
+import { saveReviews } from '../src/reviews.mjs';
 import { watch } from '../src/watch.mjs';
 import { init } from '../src/init.mjs';
 import { NOTICES_FILE } from '../src/vendor.mjs';
@@ -102,10 +103,17 @@ ok(tight.subtitle === '<p>The lede.</p>' && tight.html.includes('<hr>'), 'a rule
 ok(lede('# L\n\nSome *italic\nacross a break* here.\n').html.includes('<em>italic\nacross a break</em>'),
   'italics may run across a line break');
 
-// reviews: every section carries its button, and the page gets the outline the marks roll up through
-const nested = lede('# L\n\n## A\n\n### A1\n\n### A2\n\n## B\n');
-ok(JSON.stringify(nested.outline) === '[{"id":"a","kids":[{"id":"a1","kids":[]},{"id":"a2","kids":[]}]},{"id":"b","kids":[]}]',
-  'the outline of the sections went into the document - got ' + JSON.stringify(nested.outline));
+// reviews: every section carries its button, and the page gets the outline the marks roll up through,
+// with a fingerprint of the words each part holds of its own
+const nested = lede('# L\n\n## A\n\n### A1\n\nOne.\n\n### A2\n\nTwo.\n\n## B\n\nThree.\n');
+const shape = (list) => list.map((n) => n.id + (n.kids.length ? '(' + shape(n.kids) + ')' : '')).join(',');
+ok(shape(nested.outline) === 'a(a1,a2),b', 'the outline of the sections went into the document - got ' + shape(nested.outline));
+const edited = lede('# L\n\n## A\n\n### A1\n\nOne, edited.\n\n### A2\n\nTwo.\n\n## B\n\nThree.\n');
+ok(nested.outline[0].sig === null && edited.outline[0].kids[0].sig !== nested.outline[0].kids[0].sig &&
+  edited.outline[0].kids[1].sig === nested.outline[0].kids[1].sig && edited.outline[1].sig === nested.outline[1].sig,
+  'editing a section changes its fingerprint and no other; a chapter with no words of its own has none');
+ok(multi.sig !== lede('# L\n\n> First paragraph.\n>\n> Second, edited.\n\n---\n\n> A quote in the body.\n').sig,
+  'the standfirst is part of what a review of the document covers');
 ok((nested.html.match(/<button class="rv"/g) || []).length === 4, 'every section heading has a Reviewed button');
 const noReviews = buildDoc({ file: 'L.md', rel: 'L.md', group: '' }, new Map([['L.md', 'l']]), { ...cfg, reviews: false }, '# L\n\n## A\n');
 ok(!noReviews.html.includes('class="rv"'), '"reviews": false leaves the buttons out');
@@ -187,8 +195,34 @@ ok(!!s5.error && seqOf(s5) === seqOf(s4), 'a missing folder is reported, and the
 fs.renameSync(docs + '-away', docs);
 const s6 = await events.next();
 ok(!s6.error, 'the folder coming back clears the error');
+
+// reviews: the page saves one document's marks through the watcher, into docs.reviews.json
+const tenthNow = (await (await fetch(live.url + '__lowkey-doc/data.json')).json()).docs.find((d) => d.id === '10-tenth');
+const mark = { sig: tenthNow.outline[0].sig, at: '2026-10-28' };
+const review = (body, headers = {}) => fetch(live.url + '__lowkey-doc/reviews',
+  { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+const saved = await review({ file: '10. TENTH.md', marks: { 'a-heading': mark, 'no-such-section': mark } });
+const s7 = await events.next();
+const onDisk = JSON.parse(fs.readFileSync(path.join(tmp, 'docs.reviews.json'), 'utf8'));
+ok(saved.status === 200 && seqOf(s7) === seqOf(s6) + 1 && s7.shell === s6.shell &&
+  JSON.stringify(onDisk.docs) === JSON.stringify({ '10. TENTH.md': { 'a-heading': mark } }),
+  'a review is saved to docs.reviews.json, only for sections the document has, without reloading the page');
+const pulled = await (await fetch(live.url + '__lowkey-doc/data.json')).json();
+ok(pulled.reviews['10. TENTH.md']['a-heading'].sig === mark.sig, 'every open page gets the new marks');
+ok((await review({ file: '10. TENTH.md', marks: {} }, { Origin: 'http://rebound.example' })).status === 403,
+  'a review sent from another site is refused');
+ok((await review({ file: 'nope.md', marks: {} })).status === 400, 'a review of a document that does not exist is refused');
 events.close();
 await live.close();
+
+const withMarks = await build(cfg, { open: false, quiet: true });
+ok(fs.readFileSync(withMarks.outFile, 'utf8').includes('"10. TENTH.md":{"a-heading":{"sig":"' + mark.sig + '"'),
+  'a build reads docs.reviews.json into the page');
+fs.writeFileSync(path.join(tmp, 'docs.reviews.json'), '<<<<<<< HEAD\n');
+let refused = '';
+try { saveReviews(cfg, '10. TENTH.md', {}); } catch (err) { refused = err.message; }
+ok(/could not be read/.test(refused) && fs.readFileSync(path.join(tmp, 'docs.reviews.json'), 'utf8') === '<<<<<<< HEAD\n',
+  'a reviews file that cannot be read is never written over');
 
 // the default output folder keeps itself out of git
 ok(fs.readFileSync(path.join(tmp, '.lowkey-doc', '.gitignore'), 'utf8').includes('\n*\n'),

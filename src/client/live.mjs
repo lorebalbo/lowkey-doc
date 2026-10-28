@@ -79,7 +79,7 @@ export const LIVE_JS = String.raw`
     }).then(function(data){
       if (!app) return location.reload();
       version = data.version;
-      tell(app.apply(data.docs));
+      tell(app.apply(data.docs, data.reviews));
     }).catch(function(err){
       say('Could not load the update: ' + (err && err.message || err), 'bad', null, 0);
     }).then(function(){
@@ -126,6 +126,20 @@ export const LIVE_JS = String.raw`
         if (body.shell) shell = body.shell;
       });
     }).then(function(){ saving--; }, function(err){ saving--; throw err; });
+  };
+
+  /* ---------------- saving reviews ---------------- */
+
+  // One document's marks, all of them, to docs.reviews.json. The save comes
+  // back to every open page - this one too - as a new version of the data.
+  if (app) app.saveReviews = function(file, marks){
+    return fetch('/__lowkey-doc/reviews', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: file, marks: marks })
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(body){
+        if (!r.ok) throw new Error(body.error || 'HTTP ' + r.status);
+      });
+    });
   };
 
   /* ---------------- listening ---------------- */

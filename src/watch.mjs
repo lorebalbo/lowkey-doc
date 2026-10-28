@@ -12,6 +12,8 @@
 // Changes are detected by content, not by timestamp, so a sync client or an
 // editor touching a file without changing it costs nothing and shows nothing.
 // Editing docs.config.json reloads the configuration and the page with it.
+// The page's Reviewed marks are saved here, to docs.reviews.json, and reach
+// every open page; an edit to that file from outside (a git pull) does too.
 // ------------------------------------------------------------------
 
 import fs from 'node:fs';
@@ -20,6 +22,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadConfig, jsonLike, CONFIG_NAMES, MARGIN_MIN, MARGIN_MAX, VERSION } from './config.mjs';
 import { collectDocs, vendorAssets, pageFor, openInBrowser } from './build.mjs';
+import { readReviews, saveReviews } from './reviews.mjs';
 import { LIVE_CSS, LIVE_JS } from './client/live.mjs';
 
 export const DEFAULT_PORT = 4747;
@@ -45,6 +48,7 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
   let assets = await vendorAssets(cfg, refresh);
   let configRaw = readOr(cfg.configFile);
   let shell = shellOf(cfg, assets);
+  let marks = readReviews(cfg);
 
   const boot = crypto.randomBytes(3).toString('hex');
   let memo = null, docs = [], html = '', seq = 0, error = null;
@@ -79,14 +83,7 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     const gone = docs.filter((d) => !r.docs.some((n) => n.id === d.id));
     docs = r.docs;
     error = null;
-    html = pageFor(cfg, docs, assets);
-    seq++;
-    try {
-      fs.writeFileSync(path.join(cfg.outDir, 'index.html'), html);
-    } catch (err) {
-      log('could not write index.html: ' + err.message);
-    }
-    broadcast();
+    publish();
 
     if (seq === 1) return;
     const what = r.changed.length > 3 ? r.changed.length + ' documents'
@@ -95,7 +92,28 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     log('updated  ' + what + '  (' + (Date.now() - t0) + ' ms)');
   }
 
+  // a new version of the page: on disk, and to every open copy
+  function publish() {
+    html = pageFor(cfg, docs, assets, marks.reviews);
+    seq++;
+    try {
+      fs.writeFileSync(path.join(cfg.outDir, 'index.html'), html);
+    } catch (err) {
+      log('could not write index.html: ' + err.message);
+    }
+    broadcast();
+  }
+
   const soon = () => { clearTimeout(settle); settle = setTimeout(rebuild, SETTLE_MS); };
+
+  // docs.reviews.json changed from outside: a pull, a merge, a hand edit
+  function rereadReviews() {
+    if (!cfg.reviewsFile || readOr(cfg.reviewsFile) === marks.raw) return;
+    marks = readReviews(cfg);
+    if (marks.error) log('reviews  ' + marks.error);
+    else log('reviews  ' + path.basename(cfg.reviewsFile) + ' reloaded');
+    if (seq) publish();
+  }
 
   async function reconfigure() {
     const raw = readOr(cfg.configFile);
@@ -106,6 +124,7 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
       if (next.outDir !== cfg.outDir) assets = await vendorAssets(next);
       cfg = next;
       shell = shellOf(cfg, assets);   // a new shell tells open pages to reload
+      marks = readReviews(cfg);
       memo = null;
       log('config   ' + (cfg.configFile ? path.basename(cfg.configFile) : 'defaults') + ' reloaded');
       arm();
@@ -138,14 +157,17 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     // new name), and the config file usually lives there too.
     const docsName = path.basename(cfg.docsDir);
     const configName = cfg.configFile && path.basename(cfg.configFile);
+    const reviewsName = cfg.reviewsFile && path.basename(cfg.reviewsFile);
     const parents = new Set([path.dirname(cfg.docsDir)]);
     if (cfg.configFile) parents.add(path.dirname(cfg.configFile));
+    if (cfg.reviewsFile) parents.add(path.dirname(cfg.reviewsFile));
     for (const dir of parents) {
       try {
         const w = fs.watch(dir, (_, name) => {
           name = name && String(name);
           if (dir === path.dirname(cfg.docsDir) && (!name || name === docsName)) soon();
           if (configName && dir === path.dirname(cfg.configFile) && (!name || name === configName)) reconfigure();
+          if (reviewsName && dir === path.dirname(cfg.reviewsFile) && (!name || name === reviewsName)) rereadReviews();
         });
         w.on('error', () => {});
         watchers.push(w);
@@ -183,6 +205,26 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     return at < 0 ? page + tail : page.slice(0, at) + tail + page.slice(at);
   };
 
+  // A JSON body POSTed by this page, handed to then(value, json) - or an
+  // answer saying why not. Only this page may change the project, not any
+  // site the browser has open.
+  function posted(req, res, limit, then) {
+    const json = (status, body) => reply(res, status, TYPES['.json'], JSON.stringify(body));
+    if (req.method !== 'POST') return json(405, { error: 'POST only' });
+    const origin = req.headers.origin;
+    if (origin && origin !== 'http://' + req.headers.host) return json(403, { error: 'Not from this page' });
+    if (!/^application\/json\b/.test(req.headers['content-type'] || '')) return json(415, { error: 'JSON only' });
+
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', (chunk) => { body += chunk; if (body.length > limit) req.destroy(); });
+    req.on('end', () => {
+      let value;
+      try { value = JSON.parse(body); } catch { return json(400, { error: 'Not JSON' }); }
+      then(value, json);
+    });
+  }
+
   /* -------------------------------------------------------------- settings */
 
   // The page's settings panel saves here. They are the project's settings, so
@@ -191,19 +233,7 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
   // saved already shows them and takes the new shell from the reply; any
   // other open page reloads to pick them up.
   function saveSettings(req, res) {
-    const json = (status, body) => reply(res, status, TYPES['.json'], JSON.stringify(body));
-    if (req.method !== 'POST') return json(405, { error: 'POST only' });
-    // only this page may change the project, not any site the browser has open
-    const origin = req.headers.origin;
-    if (origin && origin !== 'http://' + req.headers.host) return json(403, { error: 'Not from this page' });
-    if (!/^application\/json\b/.test(req.headers['content-type'] || '')) return json(415, { error: 'JSON only' });
-
-    let body = '';
-    req.setEncoding('utf8');
-    req.on('data', (chunk) => { body += chunk; if (body.length > 4096) req.destroy(); });
-    req.on('end', () => {
-      let next;
-      try { next = JSON.parse(body); } catch { return json(400, { error: 'Not JSON' }); }
+    posted(req, res, 4096, (next, json) => {
       const margin = next && next.margin;
       if (margin !== null && !(Number.isFinite(margin) && margin >= MARGIN_MIN && margin <= MARGIN_MAX)) {
         return json(400, { error: 'margin must be null or ' + MARGIN_MIN + '–' + MARGIN_MAX });
@@ -227,12 +257,41 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
       }
 
       shell = shellOf(cfg, assets);
-      html = pageFor(cfg, docs, assets);
+      html = pageFor(cfg, docs, assets, marks.reviews);
       try { fs.writeFileSync(path.join(cfg.outDir, 'index.html'), html); }
       catch (err) { log('could not write index.html: ' + err.message); }
       log('settings saved to ' + path.basename(file) + '  (margin ' + (margin === null ? 'automatic' : Math.round(margin) + ' px') + ')');
       json(200, { shell });
       broadcast();
+    });
+  }
+
+  /* --------------------------------------------------------------- reviews */
+
+  // The page sends one document's marks, all of them, each time one changes:
+  // { file, marks: { "<section id>" | "": { sig, at } } }. Only the sections
+  // that document has now are taken, which is also how the marks of a section
+  // that has since been removed leave the file.
+  function saveReview(req, res) {
+    posted(req, res, 1 << 20, (body, json) => {
+      if (!cfg.reviewsFile) return json(404, { error: 'Reviews are turned off for this project' });
+      const doc = body && docs.find((d) => d.file === body.file);
+      if (!doc) return json(400, { error: 'No such document' });
+      const ids = new Set(['']);
+      (function walk(list) { for (const s of list) { ids.add(s.id); walk(s.kids); } })(doc.outline);
+      const given = body.marks && typeof body.marks === 'object' ? body.marks : {};
+      const kept = {};
+      for (const [key, m] of Object.entries(given)) if (ids.has(key)) kept[key] = m;
+
+      try {
+        marks = { ...saveReviews(cfg, doc.file, kept), error: null };
+      } catch (err) {
+        return json(500, { error: err.message });
+      }
+      const n = Object.keys(marks.reviews[doc.file] || {}).length;
+      log('reviews  ' + doc.file + '  (' + n + (n === 1 ? ' mark' : ' marks') + ')');
+      publish();
+      json(200, { version: state().version });
     });
   }
 
@@ -252,9 +311,10 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     }
     if (p === '/__lowkey-doc/data.json') {
       return reply(res, 200, TYPES['.json'],
-        JSON.stringify({ version: state().version, docs }));
+        JSON.stringify({ version: state().version, docs, reviews: marks.reviews }));
     }
     if (p === '/__lowkey-doc/settings') return saveSettings(req, res);
+    if (p === '/__lowkey-doc/reviews') return saveReview(req, res);
     if (p === '/' || p === '/index.html') {
       const page = html || '<!doctype html><meta charset="utf-8"><title>' + escHtml(cfg.title) +
         '</title><body><pre>' + escHtml(error || 'Building…') + '</pre></body>';
@@ -279,6 +339,7 @@ export async function watch(configArgs, { port = DEFAULT_PORT, open = true, refr
     console.log('  ' + docs.length + (docs.length === 1 ? ' document' : ' documents') + ' from ' + cfg.docsDir);
     console.log('  mermaid: ' + assets.mermaid.note + '  ·  elk: ' + assets.elk.note + '  ·  font: ' + assets.font.note);
     console.log('  -> ' + path.join(cfg.outDir, 'index.html'));
+    if (marks.error) console.log('  reviews: not shown - ' + marks.error);
     console.log('\n  live at ' + url + '   (Ctrl+C to stop)\n');
   }
   if (open) openInBrowser(url);

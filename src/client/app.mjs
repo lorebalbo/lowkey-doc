@@ -213,62 +213,102 @@ export const APP_JS = String.raw`
   }
 
   /* ---------------- reviews ----------------
-     A reader marks what they have read and agree with. The mark is kept on the
-     smallest sections only: a section with sections under it is reviewed when
-     every one of them is, and the document when all of its sections are. So
-     marking a document or a chapter marks everything in it, reviewing the last
-     open section of a chapter completes the chapter, and a section written
-     later opens its chapter and its document again until it is read too.
-     Like comments, the marks live in this browser and nowhere else. */
+     A reader marks what they have read and agree with. Every section owns the
+     words directly under its heading, and the document owns its standfirst
+     and whatever comes before its first section; each of those is marked on
+     its own, with a fingerprint of the words it was given for. A section is
+     reviewed when its own words are and every section under it is. So marking
+     a chapter or the document marks everything in it, reviewing the last open
+     section of a chapter completes the chapter, and clearing one opens what is
+     above it again. Words edited after their review, and a section written
+     later, leave their chapter and document open until they are read too.
+
+     The marks are the project's, in docs.reviews.json: the page shows the ones
+     its build read, and only lowkey-doc --watch can save a change (app.saveReviews). */
 
   var RV_ON = CFG.reviews !== false;
-  var reviewed = {};
-  try {
-    var rvSaved = JSON.parse(recall('reviewed') || '{}');
-    if (rvSaved && rvSaved.docs && typeof rvSaved.docs === 'object') reviewed = rvSaved.docs;
-  } catch (e) { reviewed = {}; }
+  var reviews = DATA.reviews || {};
+  var rvSaving = 0;
 
-  function findSec(list, id){
-    for (var i = 0; i < list.length; i++){
-      if (list[i].id === id) return list[i];
-      var hit = findSec(list[i].kids, id);
-      if (hit) return hit;
-    }
-    return null;
+  // the document as the root of its own outline; its own words are the "" mark
+  function rvRoot(d){ return { id: '', sig: d.sig, kids: d.outline || [] }; }
+
+  // the nodes from the document down to one of its sections (id null: the document)
+  function rvTrail(d, id){
+    var trail = [rvRoot(d)];
+    if (!id) return trail;
+    var seek = function(list){
+      for (var i = 0; i < list.length; i++){
+        trail.push(list[i]);
+        if (list[i].id === id || seek(list[i].kids)) return true;
+        trail.pop();
+      }
+      return false;
+    };
+    return seek(trail[0].kids) ? trail : null;
   }
 
-  // what a review of the document (id null) or of one section stands for: the
-  // smallest sections under it, or the document itself if it has no sections
-  function rvKeys(d, id){
-    var outline = d.outline || [];
-    var node = id ? findSec(outline, id) : { kids: outline };
-    if (!node) return [];
-    if (!node.kids.length) return [id || ''];
-    var out = [];
-    (function walk(list){
-      list.forEach(function(k){ if (k.kids.length) walk(k.kids); else out.push(k.id); });
-    })(node.kids);
+  function ownDone(marks, n){ var m = marks[n.id]; return n.sig == null || !!(m && m.sig === n.sig); }
+  function allDone(marks, n){ return ownDone(marks, n) && n.kids.every(function(k){ return allDone(marks, k); }); }
+
+  function isReviewed(d, id){
+    var trail = rvTrail(d, id);
+    return !!trail && allDone(reviews[d.file] || {}, trail[trail.length - 1]);
+  }
+
+  // A document's marks once one part of it is marked (on) or cleared: the
+  // part and everything in it, then upwards - marking completes each chapter
+  // whose sections are now all reviewed, clearing opens every one above.
+  function rvNext(d, id, on){
+    var trail = rvTrail(d, id);
+    if (!trail) return null;
+    var was = reviews[d.file] || {}, mine = {}, all = [];
+    var t = new Date(), today = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+    (function walk(n){ all.push(n); n.kids.forEach(walk); })(trail[0]);
+    all.forEach(function(n){ if (was[n.id] && n.sig != null) mine[n.id] = was[n.id]; });
+    var set = function(n){
+      if (n.sig == null) return;
+      var m = was[n.id];
+      mine[n.id] = m && m.sig === n.sig ? m : { sig: n.sig, at: today };
+    };
+    (function each(n){ if (on) set(n); else delete mine[n.id]; n.kids.forEach(each); })(trail[trail.length - 1]);
+    for (var i = trail.length - 2; i >= 0; i--){
+      if (!on){ delete mine[trail[i].id]; continue; }
+      if (!trail[i].kids.every(function(k){ return allDone(mine, k); })) break;
+      set(trail[i]);
+    }
+    var out = {};
+    all.forEach(function(n){ if (mine[n.id]) out[n.id] = mine[n.id]; });
     return out;
   }
 
-  function rvCount(d, id){
-    var mine = reviewed[d.id] || {}, keys = rvKeys(d, id);
-    return { done: keys.filter(function(k){ return mine[k]; }).length, of: keys.length };
-  }
-  function isReviewed(d, id){ var c = rvCount(d, id); return c.of > 0 && c.done === c.of; }
-
-  function setReviewed(d, id, on){
-    var mine = reviewed[d.id] || {}, now = Date.now();
-    rvKeys(d, id).forEach(function(k){ if (on) mine[k] = mine[k] || now; else delete mine[k]; });
-    if (Object.keys(mine).length) reviewed[d.id] = mine; else delete reviewed[d.id];
-    keep('reviewed', JSON.stringify({ version: 1, docs: reviewed }));
-    paintReviews();
+  function putMarks(file, marks){
+    if (marks && Object.keys(marks).length) reviews[file] = marks; else delete reviews[file];
   }
 
-  function paintBtn(btn, on, what){
+  function day(at){
+    var p = String(at).split('-');
+    var t = new Date(+p[0], +p[1] - 1, +p[2]);
+    return isNaN(t) ? at : t.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  // the latest day anything in this part was reviewed, and whether its own
+  // words have changed since
+  function rvAbout(d, id){
+    var trail = rvTrail(d, id), marks = reviews[d.file] || {}, last = '';
+    if (!trail) return {};
+    var node = trail[trail.length - 1], m = marks[node.id];
+    (function walk(n){ if (marks[n.id] && marks[n.id].at > last) last = marks[n.id].at; n.kids.forEach(walk); })(node);
+    return { last: last, changed: !!(m && node.sig != null && m.sig !== node.sig) ? m.at : '' };
+  }
+
+  function paintBtn(btn, d, id, what){
+    var on = isReviewed(d, id), about = rvAbout(d, id);
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.title = on ? 'Reviewed. Click to open ' + what + ' again' : 'Mark ' + what + ' as reviewed';
+    btn.title = on ? 'Reviewed' + (about.last ? ' on ' + day(about.last) : '') + '. Click to open ' + what + ' again'
+      : about.changed ? 'Changed since it was reviewed on ' + day(about.changed) + '. Click to review it again'
+      : 'Mark ' + what + ' as reviewed';
   }
 
   function paintReviews(){
@@ -286,22 +326,41 @@ export const APP_JS = String.raw`
     if (!d) return;
     main.querySelectorAll('.sec').forEach(function(sec){
       var btn = sec.querySelector(':scope > .sec-head > .rv');
-      if (btn) paintBtn(btn, isReviewed(d, sec.dataset.sec), 'this section');
+      if (btn) paintBtn(btn, d, sec.dataset.sec, 'this section');
     });
     var whole = main.querySelector('.rv-doc'), count = main.querySelector('.rv-count');
-    if (whole) paintBtn(whole, isReviewed(d, null), 'the whole document');
+    if (whole) paintBtn(whole, d, null, 'the whole document');
     if (count){
-      var c = rvCount(d, null);
-      count.textContent = c.done && c.done < c.of ? c.done + ' of ' + c.of + ' sections' : '';
+      // the sections with words of their own to review
+      var marks = reviews[d.file] || {}, done = 0, of = 0;
+      (function walk(list){
+        list.forEach(function(n){ if (n.sig != null){ of++; if (ownDone(marks, n)) done++; } walk(n.kids); });
+      })(d.outline || []);
+      count.textContent = done && !isReviewed(d, null) ? done + ' of ' + of + ' sections' : '';
     }
   }
 
+  // Shown at once, saved behind; a save that fails puts the marks back.
   function toggleReview(btn){
     var d = byId[current];
     if (!d) return;
+    if (!app.saveReviews){
+      toast('Reviews are saved to the project by lowkey-doc --watch. This page was opened from its file, so it can only show them.');
+      return;
+    }
     var sec = btn.classList.contains('rv-doc') ? null : btn.closest('.sec');
     var id = sec ? sec.dataset.sec : null;
-    setReviewed(d, id, !isReviewed(d, id));
+    var before = reviews[d.file], next = rvNext(d, id, !isReviewed(d, id));
+    if (!next) return;
+    putMarks(d.file, next);
+    paintReviews();
+    rvSaving++;
+    app.saveReviews(d.file, next).then(function(){ rvSaving--; }, function(err){
+      rvSaving--;
+      putMarks(d.file, before);
+      paintReviews();
+      toast('Review not saved: ' + (err && err.message || err));
+    });
   }
 
   /* ---------------- lightbox ---------------- */
@@ -957,8 +1016,10 @@ export const APP_JS = String.raw`
   var TOP_EDGE = 64;         // below the sticky top bar
   var hold = null;
 
-  function applyUpdate(next){
+  function applyUpdate(next, marks){
     var old = byId, before = docs;
+    // while this page is saving a review, its own marks are the newest there are
+    if (marks && !rvSaving) reviews = marks;
     var navOf = function(list){
       return JSON.stringify(list.map(function(d){ return [d.id, d.title, d.badge, d.group, d.file, d.sections]; }));
     };
@@ -993,6 +1054,7 @@ export const APP_JS = String.raw`
       return r;
     }
     if (navMoved || changed.indexOf(current) >= 0) patch(old[current], byId[current], r);
+    else paintReviews();
     return r;
   }
 
@@ -1279,6 +1341,7 @@ export const APP_JS = String.raw`
 
   var app = window.__lowkey_doc = {
     save: null,
+    saveReviews: null,
     apply: applyUpdate,
     bring: bring,
     doc: function(id){ return byId[id]; }

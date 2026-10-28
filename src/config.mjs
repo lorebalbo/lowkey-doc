@@ -15,6 +15,8 @@ import path from 'node:path';
 export const MARGIN_MIN = 20, MARGIN_MAX = 480;
 
 export const CONFIG_NAMES = ['docs.config.json', '.lowkey-doc.json'];
+// where the Reviewed marks are kept, at the project root beside the config
+export const REVIEWS_FILE = 'docs.reviews.json';
 
 export const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
@@ -139,6 +141,7 @@ export function loadConfig({ root, docs, folder, out, title, configPath, engine 
   cfg.docsDir = path.resolve(projectRoot, cfg.docs);
   cfg.outDir = path.resolve(projectRoot, cfg.out);
   cfg.configFile = file;
+  cfg.reviewsFile = cfg.reviews === false ? null : path.join(projectRoot, REVIEWS_FILE);
   if (!cfg.title) cfg.title = titleCase(path.basename(projectRoot)) + ' Docs';
 
   // Namespace for everything the reader's browser remembers. Two dashboards

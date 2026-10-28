@@ -6,6 +6,8 @@
 // a document whose top level is ## still starts at 1.
 // ------------------------------------------------------------------
 
+import { words, fingerprint } from './reviews.mjs';
+
 const FOLD_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 6L8 10.5 12.5 6"/></svg>';
 const CHECK_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" ' +
@@ -36,11 +38,16 @@ export function nestSections(blocks, ctx) {
     stack[stack.length - 1].kids.push(node);
     stack.push(node);
   }
-  // the shape of the sections alone, which the page needs for reviews without
-  // having to read it back out of the HTML
-  const outline = (node) => node.kids.filter((k) => typeof k !== 'string')
-    .map((k) => ({ id: k.id, kids: outline(k) }));
+  // The shape of the sections, for reviews, with a fingerprint of the words
+  // each one holds directly under its heading. A chapter with nothing of its
+  // own before its first section has nothing of its own to review (sig null).
+  const own = (node) => words(node.kids.filter((k) => typeof k === 'string').join('\n'));
+  const outline = (node) => node.kids.filter((k) => typeof k !== 'string').map((k) => {
+    const kids = outline(k), text = own(k);
+    return { id: k.id, sig: text || !kids.length ? fingerprint(text) : null, kids };
+  });
   ctx.outline = outline(root);
+  ctx.intro = own(root);
   return emitSections(root, [], ctx);
 }
 

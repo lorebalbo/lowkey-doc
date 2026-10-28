@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { esc, plain, slugify, parkFences, renderBlocks, takeQuote } from './markdown.mjs';
 import { nestSections, SECNUM_RE } from './sections.mjs';
+import { words, fingerprint } from './reviews.mjs';
 import { titleCase } from './config.mjs';
 
 function orderKey(name) {
@@ -93,7 +94,7 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
   const id = byFile.get(entry.file);
   const seen = new Map();
   const ctx = {
-    blocks: [], headings: [], byFile, numbers: new Map(), outline: [], reviews: cfg.reviews !== false,
+    blocks: [], headings: [], byFile, numbers: new Map(), outline: [], intro: '', reviews: cfg.reviews !== false,
     uniqueSlug(base) {
       const key = base || 'section';
       const n = seen.get(key) || 0;
@@ -102,7 +103,9 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
     },
   };
 
-  let title = name, subtitle = '', html;
+  // own: the document's own words, for reviews - its standfirst and whatever
+  // comes before its first section; a verbatim file is all its own words
+  let title = name, subtitle = '', html, own;
 
   if (cfg.extensions.includes(extOf(entry.file))) {
     const lines = parkFences(raw, ctx);
@@ -124,11 +127,13 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
     }
 
     html = nestSections(renderBlocks(lines, ctx, true), ctx);
+    own = (words(subtitle) + ' ' + ctx.intro).trim();
   } else {
     const kind = extOf(entry.file).slice(1);
     subtitle = '<p>Kept verbatim as <code>' + esc(kind) + '</code>.</p>';
     html = '<div class="code-wrap"><span class="code-lang">' + esc(kind) +
       '</span><pre class="code"><code>' + esc(raw) + '</code></pre></div>';
+    own = raw.replace(/\s+/g, ' ').trim();
   }
 
   const badge = (name.match(/^(\d+)/) || [])[1] || (name.trim()[0] || '?').toUpperCase();
@@ -136,6 +141,7 @@ export function buildDoc(entry, byFile, cfg, raw = fs.readFileSync(entry.abs, 'u
   return {
     id, title, subtitle, html, badge,
     outline: ctx.outline,
+    sig: own || !ctx.outline.length ? fingerprint(own) : null,
     group: entry.group,
     file: entry.rel || entry.file,
     words: raw.split(/\s+/).filter(Boolean).length,
