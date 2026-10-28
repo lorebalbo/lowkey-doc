@@ -753,19 +753,19 @@ export const CSS_CMT = `
    A highlight and its card are two views of one comment, so hovering either
    lights both (.hot); clicking either pins the pair (.on). */
 .body-wrap{position:relative;display:flex;flex-direction:column;min-height:100vh}
-.cmt-hl{background:rgba(250,204,21,.16);box-shadow:inset 0 -1px 0 rgba(250,204,21,.6);border-radius:3px;padding:0 1px;
+.cmt-hl{background:rgba(77,163,255,.16);box-shadow:inset 0 -1px 0 rgba(77,163,255,.6);border-radius:3px;padding:0 1px;
   color:inherit;cursor:pointer;transition:background .12s,box-shadow .12s}
-.cmt-hl.hot{background:rgba(250,204,21,.26);box-shadow:inset 0 -1px 0 rgba(250,204,21,.8)}
-.cmt-hl.on{background:rgba(250,204,21,.36);box-shadow:inset 0 -1px 0 #facc15}
+.cmt-hl.hot{background:rgba(77,163,255,.26);box-shadow:inset 0 -1px 0 rgba(77,163,255,.8)}
+.cmt-hl.on{background:rgba(77,163,255,.36);box-shadow:inset 0 -1px 0 var(--accent)}
 .cmt-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .cmt-card{position:absolute;left:0;top:0;width:var(--cmt-w,264px);pointer-events:auto;padding:10px 12px;
   background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;
   font-size:12.5px;line-height:1.55;transition:border-color .15s ease,box-shadow .15s ease}
-.cmt-card.hot{border-color:rgba(250,204,21,.45);box-shadow:0 4px 16px rgba(0,0,0,.4)}
-.cmt-card.on{border-color:rgba(250,204,21,.7);box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.cmt-card.hot{border-color:rgba(77,163,255,.45);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.cmt-card.on{border-color:rgba(77,163,255,.7);box-shadow:0 6px 20px rgba(0,0,0,.5)}
 .cmt-card[hidden]{display:none!important}
 .cmt-face{display:none}
-.cmt-quote{margin:0 0 7px;padding-left:9px;border-left:2px solid rgba(250,204,21,.6);color:var(--muted);
+.cmt-quote{margin:0 0 7px;padding-left:9px;border-left:2px solid rgba(77,163,255,.6);color:var(--muted);
   font-size:11.5px;line-height:1.45;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .cmt-text{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -774,14 +774,14 @@ export const CSS_CMT = `
 .cmt-act{padding:0;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;
   cursor:pointer;border-bottom:1px solid transparent}
 .cmt-act:hover{color:var(--ink);border-bottom-color:var(--ink)}
-.cmt-lost{margin:0 0 5px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#e0b252}
+.cmt-lost{margin:0 0 5px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
 
 /* tight gutters: the card shrinks to a numbered dot, opened as a popover */
 .cmt-layer.dots .cmt-card{width:22px;height:22px;padding:0;border-radius:50%;
-  background:#3a3215;border-color:#a8862a;display:grid;place-items:center;overflow:hidden}
-.cmt-layer.dots .cmt-card.hot,.cmt-layer.dots .cmt-card.on{background:#53461a;border-color:#facc15}
+  background:#10284d;border-color:#2f6db3;display:grid;place-items:center;overflow:hidden}
+.cmt-layer.dots .cmt-card.hot,.cmt-layer.dots .cmt-card.on{background:#16386b;border-color:var(--accent)}
 .cmt-layer.dots .cmt-full{display:none}
-.cmt-layer.dots .cmt-face{display:block;font-size:11px;font-weight:var(--bold);color:#f5d76e;
+.cmt-layer.dots .cmt-face{display:block;font-size:11px;font-weight:var(--bold);color:#a9d2ff;
   font-variant-numeric:tabular-nums}
 
 /* ---- comments: floating bits ---- */
