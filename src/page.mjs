@@ -9,6 +9,10 @@ import { MARGIN_MIN, MARGIN_MAX } from './config.mjs';
 const escAttr = (s) => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+const SIDEBAR_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+              <rect x="1.5" y="2.5" width="13" height="11" rx="2.5"/><path d="M6 2.5v11"/>
+            </svg>`;
+
 export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTag }) {
   const runtime = {
     title: cfg.title,
@@ -66,10 +70,8 @@ export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTa
       <div class="brand">
         <div class="brand-row">
           <span class="brand-name">${escAttr(cfg.title)}</span>
-          <button class="icon-btn" id="toggle" type="button" title="Toggle sidebar  [">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-              <rect x="1.5" y="2.5" width="13" height="11" rx="2.5"/><path d="M6 2.5v11"/>
-            </svg>
+          <button class="icon-btn" id="toggle" type="button" title="Hide sidebar  [">
+            ${SIDEBAR_SVG}
           </button>
         </div>
       </div>
@@ -85,6 +87,9 @@ export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTa
     </div>
   </aside>
   <div class="main">
+    <button class="icon-btn side-open" id="side-open" type="button" title="Show sidebar  [">
+      ${SIDEBAR_SVG}
+    </button>
     <div class="topbar" id="topbar"><div class="topbar-in"><b id="topbar-title"></b></div></div>
     <div id="main"></div>
   </div>

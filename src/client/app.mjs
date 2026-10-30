@@ -497,11 +497,14 @@ export const APP_JS = String.raw`
     fold(sec, !sec.classList.contains('shut'), true);
   });
 
-  document.getElementById('toggle').addEventListener('click', function(){
+  function toggleSide(){
+    layout.classList.add('anim');    // slid when the reader asks, never on load
     var on = layout.classList.toggle('collapsed');
     keep('collapsed', on ? '1' : '');
     schedulePlace();
-  });
+  }
+  document.getElementById('toggle').addEventListener('click', toggleSide);
+  document.getElementById('side-open').addEventListener('click', toggleSide);
 
   if (search) search.addEventListener('input', function(){
     var q = search.value.trim().toLowerCase();
@@ -537,7 +540,7 @@ export const APP_JS = String.raw`
     }
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if (e.key === '/' && search){ e.preventDefault(); search.focus(); }
-    if (e.key === '[') document.getElementById('toggle').click();
+    if (e.key === '[') toggleSide();
   });
 
   function sync(){

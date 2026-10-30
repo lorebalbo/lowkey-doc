@@ -25,7 +25,8 @@ html{-webkit-text-size-adjust:100%}
      inside the sentence, not as a heavier typeface dropped into it. */
   --semi:560; --bold:620;
   --scroll:rgba(255,255,255,.12); --scroll-on:rgba(255,255,255,.22);
-  --rail:270px;
+  /* --side is the sidebar's own width, --rail the room the page gives it */
+  --side:270px; --rail:var(--side);
   /* content column: --measure is the text width, --gutter the breathing room
      either side of it. The column is centred in the main area. */
   --measure:92ch; --gutter:46px;
@@ -78,7 +79,12 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
     radial-gradient(circle,rgba(77,163,255,.16) 0 .6px,transparent 1.1px) 137px 71px/311px 283px}
 a{color:inherit;text-decoration:none}
 .layout{display:grid;grid-template-columns:var(--rail) 1fr;min-height:100vh}
-.layout.collapsed{--rail:62px}
+.layout.collapsed{--rail:0px}
+/* Hiding the sidebar slides it out whole: its column closes while the
+   sidebar moves left by as much, so nothing in it squeezes on the way out.
+   Only a toggle the reader makes is animated (.anim), never the state a page
+   opens in. */
+.layout.anim{transition:grid-template-columns .28s ease}
 
 /* ---- scrollbars ----
    Chrome and Safari take the ::-webkit rules. Firefox only understands the two
@@ -94,8 +100,11 @@ a{color:inherit;text-decoration:none}
 @supports (-moz-appearance:none){*{scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}}
 
 /* ---- sidebar ---- */
-.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;
+.side{position:sticky;top:0;width:var(--side);height:100vh;display:flex;flex-direction:column;
   border-right:1px solid var(--line);overflow:hidden}
+.collapsed .side{transform:translateX(-100%);visibility:hidden}
+.anim .side{transition:transform .28s ease,visibility 0s}
+.anim.collapsed .side{transition:transform .28s ease,visibility 0s .28s}
 .side-top{padding:16px 14px 12px}
 .brand{min-width:0}
 /* the toggle shares a row with the title, so its 28px box - and the background
@@ -111,6 +120,20 @@ a{color:inherit;text-decoration:none}
   transition:background .15s,color .15s,border-color .15s}
 .icon-btn:hover{background:var(--hover);color:var(--ink);border-color:var(--line)}
 .icon-btn svg{width:15px;height:15px}
+/* Away, the sidebar leaves nothing behind but the way back: its button, in a
+   ring of its own in the corner, level with the title on the top bar. */
+.side-open{position:fixed;top:9px;left:12px;z-index:8;border-color:var(--line-2);
+  background:var(--surface);box-shadow:0 6px 18px -8px rgba(0,0,0,.8);
+  opacity:0;visibility:hidden;transform:scale(.8);
+  transition:opacity .14s ease,transform .14s ease,visibility 0s .14s,background .15s,color .15s,border-color .15s}
+.side-open:hover{background:var(--surface-2);border-color:var(--line-2)}
+.collapsed .side-open{opacity:1;visibility:visible;transform:none;
+  transition:opacity .2s ease .14s,transform .2s ease .14s,visibility 0s .14s,background .15s,color .15s,border-color .15s}
+/* ...and the page keeps clear of it: the top bar's title, and the title card
+   when the column comes close enough to the corner (a step: 28px, or 52px) */
+.collapsed .topbar-in{padding-left:max(var(--gutter),calc(52px - max(0px,(100vw - var(--column)) / 2)))}
+.collapsed .head{margin-top:clamp(28px,calc((52px - (100vw - var(--column)) / 2) * 100),52px)}
+.anim .head{transition:margin-top .28s ease}
 .search{margin:8px 14px 6px;position:relative}
 .search input{width:100%;padding:7px 12px 7px 31px;border:1px solid var(--line);border-radius:999px;
   background:var(--surface);color:var(--ink);font:inherit;font-size:13px;outline:none;
@@ -160,18 +183,6 @@ a{color:inherit;text-decoration:none}
 .rv-mark svg{display:block;width:100%;height:100%}
 .is-reviewed>.rv-mark{display:block}
 .sub .rv-mark{align-self:center;width:12px;height:12px}
-
-.collapsed .brand-name,.collapsed .search,.collapsed .nav-group,
-.collapsed .item-title,.collapsed .caret,.collapsed .foot-lbl,.collapsed .rv-mark{display:none}
-.collapsed .subs,.collapsed .item.open+.subs{display:none}
-.collapsed .side-top{padding:16px 0 12px}
-.collapsed .brand-row{justify-content:center}
-.collapsed .nav{padding:2px 8px;scrollbar-width:none}
-.collapsed .nav::-webkit-scrollbar{display:none}
-.collapsed .item{justify-content:center;padding:8px 0;margin-bottom:2px}
-.collapsed .num{min-width:0;font-size:12px}
-.collapsed .side-foot{padding:10px 8px}
-.collapsed .foot-btn{justify-content:center;padding:7px 0}
 
 /* the foot of the sidebar: the settings, an icon with its name beside it */
 .side-foot{display:flex;padding:10px 12px;border-top:1px solid var(--line)}
@@ -336,7 +347,6 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
 /* a chapter's box starts at the rule above it; the ring starts at its heading */
 .doc>.sec.is-lit:not(:first-child)::after{top:18px}
 @keyframes sec-lit{0%{opacity:0}16%,48%{opacity:1}100%{opacity:0}}
-
 
 /* ---- reviews ----
    Every section, and the document in its header card, has a Reviewed button:
@@ -535,7 +545,6 @@ tbody tr:last-child td{border-bottom:0}
 .empty{padding:60px var(--gutter);width:100%;max-width:var(--column);margin-inline:auto;color:var(--muted)}
 mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:0 2px}
 @media (max-width:820px){
-  .layout{grid-template-columns:var(--rail)}
   .layout:not(.collapsed) .main{display:none}
   :root{--gutter:20px}
   :root.fixed-margin{--column:100%}
@@ -552,7 +561,7 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
   .sec-tog{opacity:1}
 }
 @media print{
-  .side{display:none}.layout{grid-template-columns:1fr}
+  .side,.side-open{display:none}.layout{grid-template-columns:1fr}
   .head{border:0;border-radius:0;padding-block:20px;background:none}.head::before,.head::after{display:none}
   .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor,.rv,.rv-bar,.sec.is-lit::after{display:none}
 }
@@ -566,6 +575,7 @@ export const CSS_BAR = `
 .topbar{position:fixed;top:0;left:var(--rail);right:0;z-index:6;pointer-events:none;
   display:flex;height:46px;background:var(--bg);
   border-bottom:1px solid var(--line);transform:translateY(-101%);transition:transform .22s ease}
+.anim .topbar{transition:transform .22s ease,left .28s ease}
 .topbar.show{transform:none}
 .topbar-in{display:flex;align-items:center;gap:10px;min-width:0;width:100%;
   max-width:var(--column);margin-inline:auto;padding:0 var(--gutter)}
