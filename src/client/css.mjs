@@ -320,6 +320,23 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
   opacity:0;transition:opacity .15s,color .15s}
 .sec-head:hover .h-anchor{opacity:1}
 .h-anchor:hover{color:var(--ink)}
+/* The section a link led to: a ring lights up round it and fades away, so
+   which part of the page the link meant is never a guess. It stands off the
+   text on every side - on the left past the numbers hanging in the margin, on
+   the right past a diagram spilling out of the column - by --lit-l and
+   --lit-r, measured when it is lit. It sits behind the section, so the text,
+   and every box with a face of its own, stays on top of it. */
+.sec.is-lit{position:relative;isolation:isolate}
+.sec.is-lit::after{content:"";position:absolute;z-index:-1;pointer-events:none;
+  top:-14px;bottom:-14px;left:calc(0px - var(--lit-l,16px));right:calc(0px - var(--lit-r,16px));
+  border:1px solid var(--accent-ring);border-radius:16px;
+  background:linear-gradient(var(--accent-soft),rgba(77,163,255,.025) 260px);
+  box-shadow:0 0 24px -6px var(--accent-ring);
+  animation:sec-lit 2.4s ease-in-out both}
+/* a chapter's box starts at the rule above it; the ring starts at its heading */
+.doc>.sec.is-lit:not(:first-child)::after{top:18px}
+@keyframes sec-lit{0%{opacity:0}16%,48%{opacity:1}100%{opacity:0}}
+
 
 /* ---- reviews ----
    Every section, and the document in its header card, has a Reviewed button:
@@ -537,7 +554,7 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
 @media print{
   .side{display:none}.layout{grid-template-columns:1fr}
   .head{border:0;border-radius:0;padding-block:20px;background:none}.head::before,.head::after{display:none}
-  .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor,.rv,.rv-bar{display:none}
+  .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor,.rv,.rv-bar,.sec.is-lit::after{display:none}
 }
 `;
 

@@ -96,6 +96,7 @@ export const APP_JS = String.raw`
       current = id;
       keep('last', id);
 
+      light(null);    // a document is kept once built: left lit, it would light again on its return
       main.textContent = '';
       main.appendChild(bodyFor(d));
 
@@ -208,9 +209,34 @@ export const APP_JS = String.raw`
     revealed = id;
     unfoldTo(t);
     t.scrollIntoView(smooth ? { behavior: 'smooth' } : undefined);
+    var head = t.closest('.sec-head');    // the heading, or an <a id> the author put in it
+    if (head) light(head.parentNode);
     requestAnimationFrame(sync);   // at the foot of the page nothing scrolls, so no scroll event would
     return true;
   }
+
+  // The section a link led to lights up (.is-lit) and fades. The ring is drawn
+  // round everything in it that is on view, inside the reading area.
+  var lit = null;
+  function light(sec){
+    if (lit) lit.classList.remove('is-lit');
+    lit = sec;
+    if (!sec) return;
+    var box = sec.getBoundingClientRect(), area = main.getBoundingClientRect();
+    var l = box.left, r = box.right;
+    sec.querySelectorAll('.sec-gut,.diagram,.table-wrap').forEach(function(n){
+      if (!n.offsetParent) return;                    // inside a folded section
+      var b = n.getBoundingClientRect();
+      l = Math.min(l, b.left); r = Math.max(r, b.right);
+    });
+    sec.style.setProperty('--lit-l', Math.round(box.left - Math.max(area.left + 4, l - 16)) + 'px');
+    sec.style.setProperty('--lit-r', Math.round(Math.min(area.right - 4, r + 16) - box.right) + 'px');
+    void sec.offsetWidth;                             // lit again: the fade starts over
+    sec.classList.add('is-lit');
+  }
+  main.addEventListener('animationend', function(e){
+    if (e.animationName === 'sec-lit') e.target.classList.remove('is-lit');
+  });
 
   /* ---------------- reviews ----------------
      A reader marks what they have read and agree with. Every section owns the
@@ -450,7 +476,11 @@ export const APP_JS = String.raw`
     var a = e.target.closest('a[href^="#"]');
     if (a){
       var href = a.getAttribute('href');
-      if (href.indexOf('#/') === 0) return;
+      if (href.indexOf('#/') === 0){
+        // a link to where the page already is changes no hash, so would do nothing
+        if (a.hash === location.hash){ e.preventDefault(); route(); }
+        return;
+      }
       e.preventDefault();
       if (reveal(href.slice(1), true)) history.replaceState(null, '', '#/' + current + '/' + href.slice(1));
       return;
