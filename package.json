@@ -1,6 +1,6 @@
 {
   "name": "lowkey-doc",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Render a folder of Markdown into one self-contained documentation dashboard, with flowcharts and ER diagrams that stay readable when they get dense.",
   "repository": {
     "type": "git",
