@@ -24,6 +24,7 @@ import { loadConfig, CLI, VERSION } from '../src/config.mjs';
 import { build } from '../src/build.mjs';
 import { init } from '../src/init.mjs';
 import { watch, DEFAULT_PORT } from '../src/watch.mjs';
+import { checkForUpdate } from '../src/update.mjs';
 
 // Every option each mode accepts, and whether it takes a value. Anything else
 // is an error: a typo that silently does something else is worse than a stop.
@@ -59,6 +60,10 @@ init
   --title <name>     the dashboard title
   --force            replace the Claude command and skills with this version's.
                      An existing config is never replaced: --docs and --title edit it.
+
+Update check
+  A maximum of one time each day, lowkey-doc asks npm for the latest version.
+  To stop the update check, set NO_UPDATE_NOTIFIER=1.
 `;
 
 const usage = (msg) => { throw new Error(msg + '\nSee: ' + CLI + ' --help'); };
@@ -120,6 +125,14 @@ async function main() {
   if (opts['-h'] || opts['--help']) { console.log(HELP); return; }
   if (opts['-v'] || opts['--version']) { console.log(VERSION); return; }
 
+  // asked while the command runs, told once it is done
+  const update = checkForUpdate();
+  await run(mode, folder, opts);
+  const notice = await update();
+  if (notice) console.error(notice);
+}
+
+async function run(mode, folder, opts) {
   if (mode === 'init') {
     const r = init(folder, { docs: opts['--docs'], title: opts['--title'], force: !!opts['--force'] });
     console.log('lowkey-doc init  ' + r.root);

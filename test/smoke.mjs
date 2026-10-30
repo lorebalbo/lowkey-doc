@@ -14,6 +14,7 @@ import { saveReviews } from '../src/reviews.mjs';
 import { watch } from '../src/watch.mjs';
 import { init } from '../src/init.mjs';
 import { NOTICES_FILE } from '../src/vendor.mjs';
+import { newer, notice } from '../src/update.mjs';
 import http from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -283,6 +284,21 @@ ok(cli('init', '--watch').stderr.includes('does not apply to init'), 'a build op
 ok(cli('--out').stderr.includes('--out needs a value'), 'an option missing its value is refused');
 ok(cli('--version').stdout.trim() === JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url))).version,
   '--version prints the package version');
+const cache = path.join(tmp, 'cache');
+fs.mkdirSync(path.join(cache, 'lowkey-doc'), { recursive: true });
+fs.writeFileSync(path.join(cache, 'lowkey-doc', 'update-check.json'), JSON.stringify({ checkedAt: Date.now(), latest: '99.0.0' }));
+const piped = spawnSync(process.execPath, [fileURLToPath(new URL('../bin/lowkey-doc.mjs', import.meta.url)), 'init', '--title', 'Piped'],
+  { cwd: tmp, encoding: 'utf8', env: { ...process.env, npm_command: '', CI: '', XDG_CACHE_HOME: cache } });
+ok(piped.status === 0 && !piped.stderr.includes('Update available'), 'no update notice when the output is not a terminal');
+
+// the update notice
+ok(newer('1.10.0', '1.9.3') && newer('2.0.0', '1.99.99') && newer('1.2.0', '1.2.0-beta.1'), 'a newer release is an update');
+ok(!newer('1.1.1', '1.1.1') && !newer('1.0.9', '1.1.0') && !newer('2.0.0-beta.1', '1.1.1') && !newer('', '1.1.1'),
+  'the same, an older or a pre-release version is not');
+ok(notice('9.0.0', '1.0.0', {}).includes('npm install -g lowkey-doc@latest') &&
+  notice('9.0.0', '1.0.0', { npm_command: 'exec' }).includes('npx lowkey-doc@latest') &&
+  notice('9.0.0', '1.0.0', { npm_command: 'run-script' }).includes('Run: npm install lowkey-doc@latest'),
+  'the notice gives the update line for how it was run');
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n' + (failed ? failed + ' failed' : 'all good'));
