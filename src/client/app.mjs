@@ -497,14 +497,19 @@ export const APP_JS = String.raw`
     fold(sec, !sec.classList.contains('shut'), true);
   });
 
+  var sideBtn = document.getElementById('toggle');
+  function setSide(on){
+    layout.classList.toggle('collapsed', on);
+    sideBtn.title = (on ? 'Show' : 'Hide') + ' sidebar  [';
+  }
   function toggleSide(){
     layout.classList.add('anim');    // slid when the reader asks, never on load
-    var on = layout.classList.toggle('collapsed');
+    var on = !layout.classList.contains('collapsed');
+    setSide(on);
     keep('collapsed', on ? '1' : '');
     schedulePlace();
   }
-  document.getElementById('toggle').addEventListener('click', toggleSide);
-  document.getElementById('side-open').addEventListener('click', toggleSide);
+  sideBtn.addEventListener('click', toggleSide);
 
   if (search) search.addEventListener('input', function(){
     var q = search.value.trim().toLowerCase();
@@ -857,7 +862,7 @@ export const APP_JS = String.raw`
     if (!m) return;
     unfoldTo(m);
     var r = m.getBoundingClientRect();
-    if (r.top < 70 || r.bottom > innerHeight - 20) m.scrollIntoView({ block: 'center' });
+    if (r.top < 84 || r.bottom > innerHeight - 20) m.scrollIntoView({ block: 'center' });
   }
 
   // a highlight and its card are one comment seen twice: hovering either lights
@@ -1046,7 +1051,7 @@ export const APP_JS = String.raw`
 
   var BLOCKS = 'p,li,h1,h2,h3,h4,h5,h6,pre,table,blockquote,figure,img,hr';
   var MARK_SHARE = .5;       // past half the page changed, marking all of it says nothing
-  var TOP_EDGE = 64;         // below the sticky top bar
+  var TOP_EDGE = 78;         // below the sticky top bar
   var hold = null;
 
   function applyUpdate(next, marks){
@@ -1380,7 +1385,7 @@ export const APP_JS = String.raw`
     doc: function(id){ return byId[id]; }
   };
 
-  if (recall('collapsed')) layout.classList.add('collapsed');
+  if (recall('collapsed')) setSide(true);
   buildNav();
   route();
 })();

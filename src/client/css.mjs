@@ -107,10 +107,9 @@ a{color:inherit;text-decoration:none}
 .anim.collapsed .side{transition:transform .28s ease,visibility 0s .28s}
 .side-top{padding:16px 14px 12px}
 .brand{min-width:0}
-/* the toggle shares a row with the title, so its 28px box - and the background
-   that appears under it on hover - is centred on the title's own line rather
-   than on the title-plus-subtitle block */
-.brand-row{display:flex;align-items:center;gap:8px;min-width:0}
+/* the toggle sits at the end of the title's row (it lives outside the sidebar,
+   see .side-btn), so the row keeps its 28px and the gap before it free */
+.brand-row{display:flex;align-items:center;min-width:0;padding-right:36px}
 .brand-name{flex:1;min-width:0;height:28px;line-height:28px;font-size:14px;font-weight:var(--bold);
   letter-spacing:-.012em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand-name::before{content:"";display:inline-block;width:8px;height:8px;margin:0 9px 1px 2px;
@@ -120,19 +119,33 @@ a{color:inherit;text-decoration:none}
   transition:background .15s,color .15s,border-color .15s}
 .icon-btn:hover{background:var(--hover);color:var(--ink);border-color:var(--line)}
 .icon-btn svg{width:15px;height:15px}
-/* Away, the sidebar leaves nothing behind but the way back: its button, in a
-   ring of its own in the corner, level with the title on the top bar. */
-.side-open{position:fixed;top:9px;left:12px;z-index:8;border-color:var(--line-2);
-  background:var(--surface);box-shadow:0 6px 18px -8px rgba(0,0,0,.8);
-  opacity:0;visibility:hidden;transform:scale(.8);
-  transition:opacity .14s ease,transform .14s ease,visibility 0s .14s,background .15s,color .15s,border-color .15s}
-.side-open:hover{background:var(--surface-2);border-color:var(--line-2)}
-.collapsed .side-open{opacity:1;visibility:visible;transform:none;
-  transition:opacity .2s ease .14s,transform .2s ease .14s,visibility 0s .14s,background .15s,color .15s,border-color .15s}
+/* One button hides the sidebar and brings it back. It can't live in the
+   sidebar - the sidebar's slide would carry it off - so it is fixed over it,
+   on the title's row (.side-top's 16px down, 14px in from the edge). As the
+   sidebar slides out the button rides along until it reaches the corner,
+   12px in, and stops there; the sidebar coming back picks it up on its way.
+   That is the sidebar's own ease over 270px, cut off where the button's 215
+   run out (--ride-out), or starting only once the sidebar reaches it
+   (--ride-in) - both worked out for a --side of 270px.
+   Away, it gets a ring of its own, which comes in as it stops. */
+.side-btn{position:fixed;top:16px;left:12px;z-index:8;isolation:isolate;
+  transform:translateX(calc(var(--side) - 55px));
+  --ride-out:linear(0,.041 4.9%,.117 9.9%,.228 14.8%,.364 19.8%,.505 24.7%,.636 29.6%,.751 34.6%,.848 39.5%,.931 44.5%,1 49.4%,1);
+  --ride-in:linear(0,0 15.9%,.238 24.3%,.453 32.7%,.621 41.1%,.746 49.5%,.838 58%,.904 66.4%,.949 74.8%,.979 83.2%,.995 91.6%,1)}
+.side-btn::before{content:"";position:absolute;inset:-1px;z-index:-1;border:1px solid var(--line-2);
+  border-radius:inherit;background:var(--surface);box-shadow:0 6px 18px -8px rgba(0,0,0,.8);
+  opacity:0;transition:background .15s}
+.collapsed .side-btn{transform:none}
+.collapsed .side-btn::before{opacity:1}
+.collapsed .side-btn:hover::before{background:var(--surface-2)}
+.anim .side-btn{transition:transform .28s var(--ride-in),background .15s,color .15s,border-color .15s}
+.anim.collapsed .side-btn{transition:transform .28s var(--ride-out),background .15s,color .15s,border-color .15s}
+.anim .side-btn::before{transition:opacity .1s,background .15s}
+.anim.collapsed .side-btn::before{transition:opacity .14s ease .1s,background .15s}
 /* ...and the page keeps clear of it: the top bar's title, and the title card
-   when the column comes close enough to the corner (a step: 28px, or 52px) */
+   when the column comes close enough to the corner (a step: 28px, or 59px) */
 .collapsed .topbar-in{padding-left:max(var(--gutter),calc(52px - max(0px,(100vw - var(--column)) / 2)))}
-.collapsed .head{margin-top:clamp(28px,calc((52px - (100vw - var(--column)) / 2) * 100),52px)}
+.collapsed .head{margin-top:clamp(28px,calc((52px - (100vw - var(--column)) / 2) * 100),59px)}
 .anim .head{transition:margin-top .28s ease}
 .search{margin:8px 14px 6px;position:relative}
 .search input{width:100%;padding:7px 12px 7px 31px;border:1px solid var(--line);border-radius:999px;
@@ -292,7 +305,7 @@ export const CSS_MAIN = `
    Every heading owns the blocks under it, so a section can be folded away and
    the space between two of them can be set as one rule instead of guessed at
    from heading margins. */
-.doc [id]{scroll-margin-top:88px}
+.doc [id]{scroll-margin-top:102px}
 .sec{margin-top:30px}
 .doc>.sec{margin-top:54px;padding-top:32px;border-top:1px solid var(--line)}
 .doc>.sec:first-child{margin-top:2px;padding-top:0;border-top:0}
@@ -302,7 +315,7 @@ export const CSS_MAIN = `
 .sec.shut>.sec-body{display:none}
 
 .sec-head{position:relative;display:flex;align-items:baseline;gap:11px;cursor:pointer;
-  line-height:1.32;letter-spacing:-.018em;scroll-margin-top:98px}
+  line-height:1.32;letter-spacing:-.018em;scroll-margin-top:112px}
 h1.sec-head{margin:0 0 15px;font-size:22px;font-weight:var(--bold)}
 h2.sec-head{margin:0 0 13px;font-size:18.5px;font-weight:var(--bold)}
 h3.sec-head{margin:0 0 10px;font-size:15.5px;font-weight:var(--semi)}
@@ -561,7 +574,7 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
   .sec-tog{opacity:1}
 }
 @media print{
-  .side,.side-open{display:none}.layout{grid-template-columns:1fr}
+  .side,.side-btn{display:none}.layout{grid-template-columns:1fr}
   .head{border:0;border-radius:0;padding-block:20px;background:none}.head::before,.head::after{display:none}
   .sec.shut>.sec-body{display:block}.sec-tog,.h-anchor,.rv,.rv-bar,.sec.is-lit::after{display:none}
 }
@@ -570,10 +583,12 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
 /* The bar is solid, not frosted. A backdrop blur on a fixed bar has to be
    redrawn under it on every frame of a scroll, and when the browser misses one
    the bar flickers between its glass and the bare page beneath - and without
-   the blur, anything short of opaque lets the text scrolling under it show. */
+   the blur, anything short of opaque lets the text scrolling under it show.
+   It is 60px tall so the title centred in it sits on the sidebar title's line
+   (16px down, 28px high), and so does the corner button beside it. */
 export const CSS_BAR = `
 .topbar{position:fixed;top:0;left:var(--rail);right:0;z-index:6;pointer-events:none;
-  display:flex;height:46px;background:var(--bg);
+  display:flex;height:60px;background:var(--bg);
   border-bottom:1px solid var(--line);transform:translateY(-101%);transition:transform .22s ease}
 .anim .topbar{transition:transform .22s ease,left .28s ease}
 .topbar.show{transform:none}
