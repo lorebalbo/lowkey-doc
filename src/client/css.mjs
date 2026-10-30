@@ -558,10 +558,13 @@ mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:
 }
 `;
 
+/* The bar is solid, not frosted. A backdrop blur on a fixed bar has to be
+   redrawn under it on every frame of a scroll, and when the browser misses one
+   the bar flickers between its glass and the bare page beneath - and without
+   the blur, anything short of opaque lets the text scrolling under it show. */
 export const CSS_BAR = `
 .topbar{position:fixed;top:0;left:var(--rail);right:0;z-index:6;pointer-events:none;
-  display:flex;height:46px;
-  background:rgba(8,9,11,.78);backdrop-filter:saturate(160%) blur(14px);
+  display:flex;height:46px;background:var(--bg);
   border-bottom:1px solid var(--line);transform:translateY(-101%);transition:transform .22s ease}
 .topbar.show{transform:none}
 .topbar-in{display:flex;align-items:center;gap:10px;min-width:0;width:100%;
