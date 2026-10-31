@@ -614,17 +614,24 @@ export const CSS_DIAGRAM = `
 .diagram-name{flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;overflow:hidden;white-space:nowrap}
 .diagram-kind{flex:none;font-size:10px;font-weight:var(--bold);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
 .diagram-title{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;font-weight:var(--semi);color:var(--ink)}
-.diagram-bar{flex:none;display:flex;gap:5px}
-.diagram-btn{padding:3px 11px;font:inherit;font-size:11px;color:var(--muted);
-  background:transparent;border:1px solid var(--line-2);border-radius:999px;cursor:pointer;
-  transition:color .12s,border-color .12s}
-.diagram-btn:hover{color:var(--ink);border-color:rgba(255,255,255,.32)}
+.diagram-head{cursor:pointer;transition:background .12s}
+.diagram-head:hover{background:var(--surface-2)}
+.diagram-bar{flex:none;display:flex;gap:2px}
+.diagram-btn{width:26px;height:26px;padding:0;display:grid;place-items:center;
+  background:none;border:1px solid transparent;border-radius:999px;color:var(--faint);cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s}
+.diagram-btn svg{width:14px;height:14px}
+.diagram-btn[data-act=fold] svg{transition:transform .18s ease}
+.diagram-head:hover .diagram-btn[data-act=fold],.diagram-btn:hover{color:var(--ink)}
+.diagram-btn:hover{background:var(--hover);border-color:var(--line)}
 .diagram:has(svg):hover{border-color:var(--line-2)}
 .diagram .fail{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:left;white-space:pre-wrap}
 .diagram-note{margin-top:10px;font-size:11px;color:var(--faint);text-align:center}
 /* A collapsed diagram is its header and nothing else: a plain white box the
-   height of a line, which a click opens again. */
+   height of a line, which a click opens again. Its chevron turns to point at
+   the header, as a closed dropdown's does. */
 .diagram.is-folded{padding-bottom:0;overflow:hidden;cursor:pointer}
+.diagram.is-folded .diagram-btn[data-act=fold] svg{transform:rotate(-90deg)}
 .diagram.is-folded .diagram-head{margin-bottom:0;border-bottom-color:transparent}
 .diagram.is-folded:hover{border-color:var(--line-2)}
 .diagram.is-folded .diagram-out,.diagram.is-folded .diagram-note,

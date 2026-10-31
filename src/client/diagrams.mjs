@@ -2216,8 +2216,9 @@ export const DIAGRAMS_JS = String.raw`
     fig.classList.toggle('is-folded', on);
     var btn = fig.querySelector('[data-act="fold"]');
     if (btn){
-      btn.textContent = on ? 'Show' : 'Collapse';
-      btn.title = on ? 'Show the diagram' : 'Fold the diagram away';
+      btn.title = on ? 'Show' : 'Collapse';
+      btn.setAttribute('aria-label', btn.title);
+      btn.setAttribute('aria-expanded', on ? 'false' : 'true');
     }
   }
 
@@ -2537,6 +2538,14 @@ export const DIAGRAMS_JS = String.raw`
     var shut = e.target.closest && e.target.closest('.diagram.is-folded');
     // anywhere on a collapsed diagram opens it
     if (shut && (!btn || btn.dataset.act === 'fold')){ e.stopPropagation(); setFold(shut, false); return; }
+    // the header bar folds the diagram as its chevron does - unless the click
+    // was really the end of a drag that selected some of the title
+    var head = !btn && e.target.closest && e.target.closest('.diagram-head');
+    if (head){
+      var s = window.getSelection();
+      if (s && !s.isCollapsed && String(s).trim()) return;
+      btn = head.querySelector('[data-act="fold"]');
+    }
     if (!btn) return;
     var fig = btn.closest('.diagram');
     if (!fig) return;

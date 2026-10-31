@@ -25,6 +25,11 @@ const DIAGRAM_KINDS = {
   gantt: 'Gantt chart', pie: 'Pie chart', journey: 'User journey', mindmap: 'Mind map',
   timeline: 'Timeline', gitgraph: 'Git graph', quadrantchart: 'Quadrant chart',
 };
+const SVG_OPEN = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+const FULL_SVG = SVG_OPEN + '<path d="M3 6.5V3h3.5M9.5 3H13v3.5M13 9.5V13H9.5M6.5 13H3V9.5"/></svg>';
+const FOLD_SVG = SVG_OPEN + '<path d="M3.5 6L8 10.5 12.5 6"/></svg>';
+
 function diagramName(code) {
   let title = '';
   const body = String(code).replace(/^\s*---\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/, (_, fm) => {
@@ -521,8 +526,8 @@ export function parkFences(md, ctx) {
         ? '<figure class="diagram" data-diagram><pre class="diagram-src">' + esc(code) + '</pre>' +
           '<div class="diagram-head">' + diagramName(code) +
             '<div class="diagram-bar">' +
-              '<button class="diagram-btn" data-act="fold" type="button" title="Fold the diagram away">Collapse</button>' +
-              '<button class="diagram-btn" data-act="zoom" type="button" title="Open full size">Expand</button>' +
+              '<button class="diagram-btn" data-act="zoom" type="button" title="Open full size" aria-label="Open full size">' + FULL_SVG + '</button>' +
+              '<button class="diagram-btn" data-act="fold" type="button" title="Collapse" aria-label="Collapse" aria-expanded="true">' + FOLD_SVG + '</button>' +
             '</div>' +
           '</div>' +
           '<div class="diagram-out"></div></figure>'
