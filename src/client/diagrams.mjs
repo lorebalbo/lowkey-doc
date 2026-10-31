@@ -2180,19 +2180,11 @@ export const DIAGRAMS_JS = String.raw`
     });
   }
 
-  // The button is for comparing one diagram, not for changing the project's
-  // mind: a switch lasts as long as the page is open and no longer. The
-  // project-wide default is a config setting, where it can be reviewed.
-  function engineFor(fig, code){
+  // The engine is the project's choice, made in the config: the page does not
+  // offer the reader another one.
+  function engineFor(code){
     if (!cleanKind(code)) return 'mermaid';
-    return fig.dataset.engine || CFG.engine || 'clean';
-  }
-
-  function paintButton(fig, code, used){
-    var btn = fig.querySelector('[data-act="engine"]');
-    if (!btn) return;
-    btn.textContent = (cleanKind(code) && canClean(cleanKind(code)))
-      ? (used === 'clean' ? 'Mermaid layout' : 'Clean layout') : '';
+    return CFG.engine || 'clean';
   }
 
   /* ------------------------------------------------------------- folding
@@ -2233,7 +2225,7 @@ export const DIAGRAMS_JS = String.raw`
     var code = fig.querySelector('.diagram-src').textContent;
     if (!fig._foldSeen){ fig._foldSeen = true; paintFold(fig, folded(fig)); }
     if (fig.classList.contains('is-folded')) return Promise.resolve();
-    var want = force || engineFor(fig, code);
+    var want = force || engineFor(code);
     if (fig.dataset.drawn === want) return Promise.resolve();
     fig.dataset.drawn = want;
     var kind = cleanKind(code);
@@ -2251,7 +2243,7 @@ export const DIAGRAMS_JS = String.raw`
       if (note) note.remove();
       done = renderMermaid(fig, code);
     }
-    return done.then(function(){ paintButton(fig, code, fig.dataset.drawn); });
+    return done;
   }
 
   function drawAll(scope){
@@ -2553,12 +2545,6 @@ export const DIAGRAMS_JS = String.raw`
       if (pinned){ clear(pinned.svg); pinned = null; }
       hideTip();
       setFold(fig, true);
-      return;
-    }
-    if (btn.dataset.act === 'engine'){
-      var next = fig.dataset.drawn === 'clean' ? 'mermaid' : 'clean';
-      fig.dataset.engine = next;
-      draw(fig, next);
       return;
     }
     if (btn.dataset.act === 'zoom'){

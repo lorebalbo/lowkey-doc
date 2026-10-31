@@ -1189,13 +1189,12 @@ export const APP_JS = String.raw`
 
     // Edited diagrams, when they line up one for one with the ones they
     // replace: the old drawing stays up, faded, until the new one is ready -
-    // no collapse and regrow under the reader - and a layout switched, or an
-    // entity opened, from the page stays that way.
+    // no collapse and regrow under the reader - and an entity opened from the
+    // page stays open.
     var stale = olds.filter(function(f){ return !used.has(f); });
     if (stale.length !== fresh.length) return;
     fresh.forEach(function(f, i){
       var o = stale[i];
-      if (o.dataset.engine) f.dataset.engine = o.dataset.engine;
       if (o._open) f._open = o._open;
       var out = f.querySelector('.diagram-out'), prev = o.querySelector('.diagram-out');
       if (!out || !prev || !prev.firstChild) return;

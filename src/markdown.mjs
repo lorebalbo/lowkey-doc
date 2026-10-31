@@ -523,7 +523,6 @@ export function parkFences(md, ctx) {
             '<div class="diagram-bar">' +
               '<button class="diagram-btn" data-act="fold" type="button" title="Fold the diagram away">Collapse</button>' +
               '<button class="diagram-btn" data-act="zoom" type="button" title="Open full size">Expand</button>' +
-              '<button class="diagram-btn" data-act="engine" type="button" title="Switch layout engine"></button>' +
             '</div>' +
           '</div>' +
           '<div class="diagram-out"></div></figure>'

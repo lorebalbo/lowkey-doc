@@ -81,8 +81,8 @@ export function collectDocs(cfg, memo = null) {
   return { docs, changed, memo: { layout, files } };
 }
 
-// ELK travels even when the default engine is mermaid: the reader can switch
-// any single diagram over from the page, and that has to work offline too.
+// ELK travels even when the default engine is mermaid, so a config edit under
+// --watch can turn the clean layout on without fetching anything.
 export async function vendorAssets(cfg, refresh = false) {
   fs.mkdirSync(cfg.outDir, { recursive: true });
   // The default output folder keeps itself out of git, so no project has to

@@ -619,7 +619,6 @@ export const CSS_DIAGRAM = `
   background:transparent;border:1px solid var(--line-2);border-radius:999px;cursor:pointer;
   transition:color .12s,border-color .12s}
 .diagram-btn:hover{color:var(--ink);border-color:rgba(255,255,255,.32)}
-.diagram-btn:empty{display:none}
 .diagram:has(svg):hover{border-color:var(--line-2)}
 .diagram .fail{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:left;white-space:pre-wrap}
 .diagram-note{margin-top:10px;font-size:11px;color:var(--faint);text-align:center}
