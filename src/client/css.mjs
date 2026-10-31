@@ -624,7 +624,7 @@ export const CSS_DIAGRAM = `
 .diagram-btn[data-act=fold] svg{transition:transform .18s ease}
 .diagram-head:hover .diagram-btn[data-act=fold],.diagram-btn:hover{color:var(--ink)}
 .diagram-btn:hover{background:var(--hover);border-color:var(--line)}
-.diagram:has(svg):hover{border-color:var(--line-2)}
+.diagram:has(.diagram-out > svg):hover{border-color:var(--line-2)}
 .diagram .fail{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:left;white-space:pre-wrap}
 .diagram-note{margin-top:10px;font-size:11px;color:var(--faint);text-align:center}
 /* A collapsed diagram is its header and nothing else: a plain white box the

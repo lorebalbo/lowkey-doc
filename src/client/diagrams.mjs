@@ -2557,7 +2557,7 @@ export const DIAGRAMS_JS = String.raw`
       return;
     }
     if (btn.dataset.act === 'zoom'){
-      var svg = fig.querySelector('svg');
+      var svg = fig.querySelector('.diagram-out > svg');
       if (svg && window.__lightbox) window.__lightbox(svg);
     }
   }, true);

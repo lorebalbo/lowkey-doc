@@ -469,7 +469,7 @@ export const APP_JS = String.raw`
     // left alone here.
     var fig = e.target.closest('.diagram');
     if (fig && !e.target.closest('svg.dg') && !e.target.closest('.diagram-head')){
-      var svg = fig.querySelector('svg');
+      var svg = fig.querySelector('.diagram-out > svg');
       if (svg) openBox(svg);
       return;
     }
