@@ -19,10 +19,18 @@ export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTa
     comments: cfg.comments !== false,
     reviews: cfg.reviews !== false,
     margin: cfg.layout.margin,
+    theme: cfg.theme,
   };
-  // fixed margins are set on the root, so the page is laid out right from its first paint
-  const rootAttrs = cfg.layout.margin == null ? ''
-    : ' class="fixed-margin" style="--margin:' + Number(cfg.layout.margin) + 'px"';
+  // The reader's own theme, if they picked one in the settings, replaces the
+  // project's before anything is drawn, so the page never flashes the other.
+  // The key is the one app.mjs keeps it under (keep('theme')).
+  const themeKey = JSON.stringify(cfg.ns + ':theme').replace(/</g, '\\u003c');
+  const themeBoot = '<script>try{var t=localStorage.getItem(' + themeKey + ');' +
+    'if(t==="system"||t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}<\/script>';
+  // the theme and fixed margins are set on the root, so the page is painted and
+  // laid out right from its first frame
+  const rootAttrs = ' data-theme="' + escAttr(cfg.theme) + '"' + (cfg.layout.margin == null ? ''
+    : ' class="fixed-margin" style="--margin:' + Number(cfg.layout.margin) + 'px"');
 
   const data = JSON.stringify({ docs, reviews: cfg.reviews === false ? {} : reviews }).replace(/</g, '\\u003c');
 
@@ -57,6 +65,7 @@ export function renderPage({ cfg, docs, reviews = {}, fontCss, mermaidTag, elkTa
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escAttr(cfg.title)}</title>
+${themeBoot}
 <style>${fontCss}${allCss()}</style>
 </head>
 <body>
@@ -98,6 +107,27 @@ ${commentBits}${cfg.comments === false && cfg.reviews === false ? '' : `
     <button class="icon-btn" id="settings-close" type="button" title="Close  Esc">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
     </button>
+  </div>
+  <div class="settings-row">
+    <div class="settings-label">
+      <label id="set-theme-lbl">Theme</label>
+      <span class="settings-val" id="set-theme-val"></span>
+    </div>
+    <div class="seg" id="set-theme" role="radiogroup" aria-labelledby="set-theme-lbl">
+      <button type="button" role="radio" data-pick="light" aria-checked="false">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="2.8"/><path d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.5 3.5l1.05 1.05M11.45 11.45l1.05 1.05M3.5 12.5l1.05-1.05M11.45 4.55l1.05-1.05"/>
+        </svg>Light</button>
+      <button type="button" role="radio" data-pick="dark" aria-checked="false">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13.2 9.9A5.6 5.6 0 0 1 6.1 2.8a5.6 5.6 0 1 0 7.1 7.1z"/>
+        </svg>Dark</button>
+      <button type="button" role="radio" data-pick="system" aria-checked="false">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11v2.6"/>
+        </svg>System</button>
+    </div>
+    <div class="settings-hint"><span>Yours alone, kept in this browser</span></div>
   </div>
   <div class="settings-row">
     <div class="settings-label">

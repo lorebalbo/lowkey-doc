@@ -69,8 +69,23 @@ export const DIAGRAMS_JS = String.raw`
 
   /* ------------------------------------------------------------ mermaid */
 
+  // the theme the page is painted in now: "system" is whichever the computer asks for
+  function themeNow(){
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t === 'system') return window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return t === 'light' ? 'light' : 'dark';
+  }
+  var mermaidTheme = null;
+
   function initMermaid(){
     if (mermaidReady || typeof mermaid === 'undefined') return mermaidReady;
+    // mermaid is handed the page's own theme, read off the root: its colour
+    // maths needs plain colours, so these tokens are kept as hex in css.mjs
+    mermaidTheme = themeNow();
+    var css = getComputedStyle(document.documentElement);
+    function v(name){ return css.getPropertyValue(name).trim(); }
+    var ink = v('--ink'), surface = v('--surface'), node = v('--dg-node'), nodeLine = v('--dg-node-line'),
+        frameLine = v('--dg-er-badge-line');
     mermaid.initialize({
       startOnLoad: false,
       // no click callbacks or javascript: links: a diagram can only draw
@@ -79,19 +94,19 @@ export const DIAGRAMS_JS = String.raw`
       fontFamily: getComputedStyle(document.body).fontFamily,
       themeVariables: {
         fontSize: '13px',
-        darkMode: true,
-        background: '#13161b',
-        primaryColor: '#1a1e24', primaryBorderColor: '#3a414c', primaryTextColor: '#f3f5f7',
-        secondaryColor: '#13161b', secondaryBorderColor: '#323842', secondaryTextColor: '#f3f5f7',
-        tertiaryColor: '#13161b', tertiaryBorderColor: '#323842', tertiaryTextColor: '#f3f5f7',
-        lineColor: '#6b7480', textColor: '#f3f5f7',
-        mainBkg: '#1a1e24', nodeBorder: '#3a414c', clusterBkg: '#0f1216', clusterBorder: '#262b33',
-        edgeLabelBackground: '#13161b', labelBoxBkgColor: '#13161b', labelBoxBorderColor: '#3a414c',
-        pie1: '#4da3ff', pie2: '#1e6fff', pie3: '#1446b0', pie4: '#9aa2ad', pie5: '#3a414c',
-        pieTitleTextSize: '14px', pieSectionTextSize: '12px', pieStrokeColor: '#13161b', pieOuterStrokeColor: '#323842'
+        darkMode: mermaidTheme === 'dark',
+        background: surface,
+        primaryColor: node, primaryBorderColor: nodeLine, primaryTextColor: ink,
+        secondaryColor: surface, secondaryBorderColor: frameLine, secondaryTextColor: ink,
+        tertiaryColor: surface, tertiaryBorderColor: frameLine, tertiaryTextColor: ink,
+        lineColor: v('--dg-edge'), textColor: ink,
+        mainBkg: node, nodeBorder: nodeLine, clusterBkg: v('--dg-group'), clusterBorder: v('--dg-group-line'),
+        edgeLabelBackground: surface, labelBoxBkgColor: surface, labelBoxBorderColor: nodeLine,
+        pie1: v('--pie-1'), pie2: v('--pie-2'), pie3: v('--pie-3'), pie4: v('--pie-4'), pie5: v('--pie-5'),
+        pieTitleTextSize: '14px', pieSectionTextSize: '12px', pieStrokeColor: surface, pieOuterStrokeColor: frameLine
       },
       flowchart: { curve: 'basis', padding: 14, nodeSpacing: 38, rankSpacing: 46, useMaxWidth: true, htmlLabels: true },
-      er: { fill: '#1a1e24', stroke: '#3a414c', useMaxWidth: true, entityPadding: 12 },
+      er: { fill: node, stroke: nodeLine, useMaxWidth: true, entityPadding: 12 },
       sequence: { useMaxWidth: true, actorMargin: 44, mirrorActors: false }
     });
     mermaidReady = true;
@@ -822,15 +837,18 @@ export const DIAGRAMS_JS = String.raw`
     return box ? { x: box.x, y: box.y } : { x: 0, y: 0 };
   }
 
-  // whether a classDef colour is a light one - written, most likely, for a
-  // light page - so the text on it has to go dark to stay readable
-  function isLight(c){
+  // the ink a classDef fill needs: ' on-light' for a light fill, so its text
+  // goes dark, ' on-dark' for a dark one, so it goes light - whichever the
+  // page's theme - and nothing for a mid-tone or see-through fill
+  function inkFor(c){
     var probe = document.createElement('i');
     probe.style.color = c;
     document.body.appendChild(probe);
     var v = (getComputedStyle(probe).color.match(/[\d.]+/g) || []).map(Number);
     probe.remove();
-    return v.length >= 3 && (v[3] == null || v[3] > .5) && .299*v[0] + .587*v[1] + .114*v[2] > 150;
+    if (v.length < 3 || (v[3] != null && v[3] <= .5)) return '';
+    var y = .299*v[0] + .587*v[1] + .114*v[2];
+    return y > 150 ? ' on-light' : y < 100 ? ' on-dark' : '';
   }
 
   // classDef / style directives, flattened into a plain object
@@ -1297,7 +1315,7 @@ export const DIAGRAMS_JS = String.raw`
       if (!n || n.isGroup) return;
       var st = styleOf(n);
       var g = mk('g', { 'data-node': id }, 'dg-el dg-node' + (n.shape === 'erBox' ? ' dg-er'
-        : !isEr && !entered[id] ? ' is-root' : '') + (st.fill && isLight(st.fill) ? ' on-light' : ''));
+        : !isEr && !entered[id] ? ' is-root' : '') + (st.fill ? inkFor(st.fill) : ''));
       if (n.shape === 'erBox'){ erBoxEl(g, a, n, st); gNode.appendChild(g); return; }
       var s = shapeEl(a.x, a.y, a.w, a.h, n.shape);
       s.setAttribute('class', 'dg-node-shape');
@@ -2303,6 +2321,17 @@ export const DIAGRAMS_JS = String.raw`
     [].slice.call((scope || document).querySelectorAll('[data-diagram]')).forEach(function(f){ draw(f); });
   }
 
+  // The page changed theme. A diagram drawn here is coloured by the stylesheet
+  // and follows on its own; one mermaid drew has the old colours written into
+  // it, so mermaid is set up again with the new ones and those are drawn again.
+  function retheme(){
+    if (mermaidTheme === null || themeNow() === mermaidTheme) return;
+    mermaidReady = false;
+    [].slice.call(document.querySelectorAll('[data-diagram]')).forEach(function(f){
+      if (f.dataset.drawn === 'mermaid'){ f.dataset.drawn = ''; draw(f, 'mermaid'); }
+    });
+  }
+
   // First pass so nothing is blank, then one more once the webfont has landed
   // and the measurements are the ones the reader will actually see.
   var refit = false;
@@ -2614,6 +2643,6 @@ export const DIAGRAMS_JS = String.raw`
     }
   }, true);
 
-  window.__diagrams = { drawAll: drawAll, draw: draw };
+  window.__diagrams = { drawAll: drawAll, draw: draw, retheme: retheme };
 })();
 `;

@@ -123,6 +123,19 @@ ok(html.includes('"reviews":true'), 'the page is told reviews are on');
 ok(html.includes('vendor/mermaid.min.js') || html.includes('cdn.jsdelivr'), 'mermaid is referenced');
 ok(html.includes('__LOWKEY_DOC__'), 'the runtime config is in the page');
 ok(html.includes('Smoke Docs'), 'the title reached the page');
+ok(html.includes('<html lang="en" data-theme="system">'), 'the page opens in the default theme, the system\'s');
+ok(html.indexOf('localStorage.getItem("lowkey-doc:smoke-docs:theme")') > 0 &&
+  html.indexOf('localStorage.getItem("lowkey-doc:smoke-docs:theme")') < html.indexOf('<style>'),
+  "the reader's own theme is put on the page before its styles");
+ok(html.includes('id="set-theme"') && ['light', 'dark', 'system'].every((t) => html.includes('data-pick="' + t + '"')),
+  'the settings offer light, dark and system');
+const bare = { font: { css: '' }, elk: { tag: null }, mermaid: { tag: null } };
+ok(pageFor({ ...cfg, theme: 'light' }, r.docs, bare).includes('<html lang="en" data-theme="light">'),
+  'theme: light reaches the page');
+const sepia = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lowkey-doc-theme-')), 'docs.config.json');
+fs.writeFileSync(sepia, JSON.stringify({ docs, theme: 'sepia' }));
+ok((() => { try { loadConfig({ configPath: sepia }); return false; }
+  catch (e) { return /theme must be 'system', 'dark' or 'light'/.test(e.message); } })(), 'an unknown theme is refused');
 ok(!/<script>\s*<\/script>/.test(html), 'no empty inline script blocks were emitted');
 ok(html.split('<script').length - 1 >= 4, 'every script block is present');
 ok(r.bytes > 50_000, 'the page has real content in it (' + (r.bytes / 1024).toFixed(0) + ' KB)');

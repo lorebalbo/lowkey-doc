@@ -13,6 +13,8 @@ import path from 'node:path';
 
 // the range layout.margin can take, and the page's slider with it
 export const MARGIN_MIN = 20, MARGIN_MAX = 480;
+// the page's themes; the palettes themselves are in client/css.mjs
+export const THEMES = ['system', 'dark', 'light'];
 
 export const CONFIG_NAMES = ['docs.config.json', '.lowkey-doc.json'];
 // where the Reviewed marks are kept, at the project root beside the config
@@ -68,6 +70,11 @@ const DEFAULTS = {
     // Set from the page itself too: the settings button in the sidebar.
     margin: null,
   },
+  // 'system' follows the reader's computer; 'dark' or 'light' fixes one. Both
+  // are made for long reading: neither runs to pure black or pure white, and
+  // every colour in them is a muted one. A reader can pick their own in the
+  // page's settings; this is what they see until they do.
+  theme: 'system',
   // Reader features. Turn off what a given project does not want.
   comments: true,
   reviews: true,
@@ -155,6 +162,9 @@ export function loadConfig({ root, docs, folder, out, title, configPath, engine 
   }
   if (!['clean', 'mermaid'].includes(cfg.diagrams.engine)) {
     throw new Error("diagrams.engine must be 'clean' or 'mermaid', got: " + cfg.diagrams.engine);
+  }
+  if (!THEMES.includes(cfg.theme)) {
+    throw new Error("theme must be 'system', 'dark' or 'light', got: " + JSON.stringify(cfg.theme));
   }
   return cfg;
 }

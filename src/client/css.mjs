@@ -1,30 +1,90 @@
 // css.mjs - the whole stylesheet, inlined into the page.
 
+// The two palettes, written once each: the light one is used twice, by its own
+// name and by "system" on a computer set to light.
+const DARK = `
+  color-scheme:dark;
+  --bg:#1c1d20; --surface:#222326; --surface-2:#292a2e;
+  --ink:#d6d3cc; --muted:#a19d95; --faint:#77736c;
+  --wash:236 232 224; --line:rgb(var(--wash) / .085); --line-2:rgb(var(--wash) / .15);
+  --shadow:0 0 0; --shadow-k:.85;
+  /* the one accent, a dusk blue, for what is lit, current or alive; reviewed is
+     a sage as soft as it, so the two sit together */
+  --accent:#86a9d4; --ok:#86b99a; --bad:#d39090;
+  /* a filled button is the ink with the page's colour on it */
+  --on-ink:#1c1d20; --ink-hover:#c4c1ba;
+  --code-bg:rgb(var(--wash) / .06); --code-bg-on-white:rgb(var(--wash) / .07); --code-bg-table:rgb(var(--wash) / .06);
+  --code-ring:rgb(var(--wash) / .1); --code-ink:#bccbdc; --code-var:#d2b47c; --code-text:#cdcac3;
+  --scroll:rgb(var(--wash) / .13); --scroll-on:rgb(var(--wash) / .24);
+  --sky:radial-gradient(55% 45% at 100% 0%,rgb(134 169 212 / .05),transparent 70%);
+  /* the title card's lamp: its colour, its rim's, and how bright it burns */
+  --glow-face:120 158 206; --glow-rim:150 180 220; --glow-k:.6;
+  --card-edge-1:rgb(var(--wash) / .11); --card-edge-2:rgb(var(--wash) / .06); --card-edge-3:rgb(var(--wash) / .05);
+  --card-sheen:rgb(var(--wash) / .02); --tip-bg:#2c2d31;
+  /* HTTP verbs, and the colours code is highlighted in */
+  --v-get:#8fb0d8; --v-post:#8dbd9d; --v-put:#cfaa76; --v-patch:#ada0d3; --v-delete:#d39090; --v-other:#aaa69e;
+  --hl-key:#9fb9d8; --hl-str:#9cc0a3; --hl-num:#cfaa76; --hl-lit:#b3a6d4; --hl-kw:#8fb0d8;
+  --hl-type:#88bcc0; --hl-fn:#b3a6d4; --hl-var:#cf9bb3; --hl-com:#7c7973;
+  --pie-1:#86a9d4; --pie-2:#5f84b3; --pie-3:#3f5f87; --pie-4:#a19d95; --pie-5:#45474d;
+  /* diagrams */
+  --dg-node:#26272b; --dg-node-line:#45464b; --dg-edge:#7f7c76; --dg-edge-text:#a19d95;
+  --dg-group:#1f2023; --dg-group-line:#333438; --dg-hot-soft:#2a3442;
+  --dg-tie:#45464b; --dg-life:#3a3b40; --dg-text-2:#bdb9b1;
+  --dg-er-line:#323337; --dg-er-badge:#2d2e32; --dg-er-badge-line:#3d3e43; --dg-er-badge-ink:#a19d95;
+  --dg-er-badge-pk:#35373c; --dg-er-badge-pk-line:#4b4d53;
+  /* sequences: notes are the one warm surface, so an aside never reads as a message */
+  --dg-seq-num:#5a5c62; --dg-seq-num-ink:#ecebe6;
+  --dg-seq-note:#2b2922; --dg-seq-note-line:#4a4535; --dg-seq-note-ink:#d6ccab;`;
+
+const LIGHT = `
+  color-scheme:light;
+  /* paper, not a lightbox: an off-white with a little warmth in it, and ink
+     that is a deep warm grey rather than black */
+  --bg:#f3f0e9; --surface:#f8f6f0; --surface-2:#ebe7de;
+  --ink:#2f2d29; --muted:#625e56; --faint:#8c877d;
+  --wash:70 55 30; --line:rgb(var(--wash) / .12); --line-2:rgb(var(--wash) / .2);
+  --shadow:70 55 30; --shadow-k:.28;
+  --accent:#3a6797; --ok:#357353; --bad:#a34444;
+  --on-ink:#f6f4ee; --ink-hover:#4a4741;
+  --code-bg:rgb(var(--wash) / .06); --code-bg-on-white:rgb(var(--wash) / .06); --code-bg-table:rgb(var(--wash) / .055);
+  --code-ring:rgb(var(--wash) / .11); --code-ink:#3b4d6e; --code-var:#87601c; --code-text:#36342f;
+  --scroll:rgb(var(--wash) / .18); --scroll-on:rgb(var(--wash) / .3);
+  --sky:radial-gradient(55% 45% at 100% 0%,rgb(58 103 151 / .035),transparent 70%);
+  --glow-face:58 103 151; --glow-rim:58 103 151; --glow-k:.2;
+  --card-edge-1:rgb(var(--wash) / .16); --card-edge-2:rgb(var(--wash) / .11); --card-edge-3:rgb(var(--wash) / .1);
+  --card-sheen:rgb(255 255 255 / .4); --tip-bg:#fbfaf6;
+  --v-get:#2f5f93; --v-post:#2f6f4c; --v-put:#8a5a16; --v-patch:#644aa0; --v-delete:#9c3a3a; --v-other:#625e56;
+  --hl-key:#2f5f93; --hl-str:#3a6e4c; --hl-num:#8a5a16; --hl-lit:#644aa0; --hl-kw:#2f5f93;
+  --hl-type:#2a6b72; --hl-fn:#644aa0; --hl-var:#94416a; --hl-com:#8c877d;
+  --pie-1:#3a6797; --pie-2:#6b8fb8; --pie-3:#a3bcd6; --pie-4:#8c877d; --pie-5:#d3cec3;
+  --dg-node:#fbfaf6; --dg-node-line:#c9c3b7; --dg-edge:#8c877d; --dg-edge-text:#625e56;
+  --dg-group:#efebe3; --dg-group-line:#ddd8cd; --dg-hot-soft:#e2e8ef;
+  --dg-tie:#c9c3b7; --dg-life:#d6d1c6; --dg-text-2:#4a4740;
+  --dg-er-line:#e3ded3; --dg-er-badge:#eeeae2; --dg-er-badge-line:#dbd5c9; --dg-er-badge-ink:#625e56;
+  --dg-er-badge-pk:#e3dfd5; --dg-er-badge-pk-line:#cdc6b8;
+  --dg-seq-num:#8c877d; --dg-seq-num-ink:#fff;
+  --dg-seq-note:#f6efda; --dg-seq-note-line:#e0d3ab; --dg-seq-note-ink:#5a4e2e;`;
+
 export const CSS = `
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 :root{
-  color-scheme:dark;
-  --bg:#08090b; --ink:#f3f5f7; --muted:#9aa2ad; --faint:#5f6873; --line:rgba(255,255,255,.08);
-  --line-2:rgba(255,255,255,.16); --surface:#13161b; --surface-2:#1a1e24; --hover:rgba(255,255,255,.05);
-  /* the one accent: an electric blue, used for what is lit, current or alive */
-  --accent:#4da3ff; --accent-soft:rgba(77,163,255,.12); --accent-ring:rgba(77,163,255,.36);
-  /* reviewed: a green as light and as cool as the blue, so the two sit together */
-  --ok:#45cf98; --ok-soft:rgba(69,207,152,.12); --ok-ring:rgba(69,207,152,.36);
-  /* a filled button is white with dark text */
-  --on-ink:#0b0d10; --ink-hover:#dde2e8;
+  /* Everything a theme does not change. The colour tokens below this block are
+     the theme's; the derived ones here are worked out from them, so a theme
+     sets its accent once and every wash, ring and glow of it follows. */
+  --accent-soft:color-mix(in srgb,var(--accent) 13%,transparent);
+  --accent-ring:color-mix(in srgb,var(--accent) 38%,transparent);
+  --ok-soft:color-mix(in srgb,var(--ok) 13%,transparent);
+  --ok-ring:color-mix(in srgb,var(--ok) 38%,transparent);
+  --hover:rgb(var(--wash) / .05);
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --mono:ui-monospace,"JetBrains Mono","Cascadia Mono",SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  /* inline code */
-  --code-bg:rgba(255,255,255,.06); --code-bg-on-white:rgba(255,255,255,.07); --code-bg-table:rgba(255,255,255,.06);
-  --code-ring:rgba(255,255,255,.1); --code-ink:#d4e5ff; --code-var:#f0c674; --code-text:#d6dbe2;
   /* Inter is vendored into the page as a variable font; everything after it is
      the offline fallback. Swap this one line to re-face the whole dashboard. */
   --font:Inter,"Avenir Next","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
   /* Emphasis is one notch of weight, not two: bold should read as emphasis
      inside the sentence, not as a heavier typeface dropped into it. */
   --semi:560; --bold:620;
-  --scroll:rgba(255,255,255,.12); --scroll-on:rgba(255,255,255,.22);
   /* --side is the sidebar's own width, --rail the room the page gives it */
   --side:270px; --rail:var(--side);
   /* content column: --measure is the text width, --gutter the breathing room
@@ -32,24 +92,49 @@ html{-webkit-text-size-adjust:100%}
   --measure:92ch; --gutter:46px;
   --column:calc(var(--measure) + var(--gutter) * 2);
   --margin:var(--gutter);
-  /* diagrams */
-  --dg-node:#1a1e24; --dg-node-line:#3a414c; --dg-edge:#6b7480; --dg-edge-text:#9aa2ad;
-  --dg-group:#0f1216; --dg-group-line:#262b33; --dg-hot:#4da3ff; --dg-hot-soft:#10284d;
-  --dg-tie:#3a414c; --dg-life:#2e343d; --dg-text-2:#b7c0cc;
   /* entity tables: the header band and the row hover are washes laid over the
      box, so a classDef colour on an entity still reads through them */
-  --dg-er-head:rgba(255,255,255,.035); --dg-er-head-hot:rgba(77,163,255,.08);
-  --dg-er-line:#262b33; --dg-er-hover:rgba(77,163,255,.1);
-  --dg-er-badge:#22272e; --dg-er-badge-line:#323842; --dg-er-badge-ink:#9aa2ad;
-  --dg-er-badge-pk:#2b323b; --dg-er-badge-pk-line:#424a56;
-  /* sequences: notes are the one warm surface, so an aside never reads as a message */
-  --dg-seq-num:#4b535e; --dg-seq-note:#221f14; --dg-seq-note-line:#4a4128; --dg-seq-note-ink:#e6d7a6;
+  --dg-er-head:rgb(var(--wash) / .035); --dg-er-head-hot:color-mix(in srgb,var(--accent) 9%,transparent);
+  --dg-er-hover:color-mix(in srgb,var(--accent) 10%,transparent);
+  --dg-hot:var(--accent);
 }
+
+/* ---- themes ----
+   Two, both made to be read for hours. What tires the eye on a screen is not
+   dark or light as such but the extremes: pure white on pure black (the text
+   glows and smears, worst for astigmatic eyes), a glaring white page, and
+   saturated colour. So neither theme goes near the ends of the scale - body
+   text sits near 11-12:1, not the 18:1 of white on black, and secondary text
+   still clears 5.5:1 - the neutrals lean a little warm, and every colour is a
+   muted one, kept for what means something. Nothing textured sits behind the
+   text. The theme is data-theme on the root - dark, light, or system, which
+   follows the computer's own setting as it changes - set from the config
+   (theme), or from the reader's own pick in Settings, before the first frame.
+
+   --wash and --shadow are bare rgb triplets, used as rgb(var(--wash) / a): the
+   wash is what hover, rules and plates are made of - light on the dark page,
+   dark on the light one - and --shadow-k scales every shadow at once.
+   Tokens mermaid is handed (diagrams.mjs, initMermaid) must stay plain hex. */
+:root,:root[data-theme=dark],:root[data-theme=system]{
+${DARK}
+}
+:root[data-theme=light]{
+${LIGHT}
+}
+/* system: the reader's own setting, followed as it changes */
+@media (prefers-color-scheme:light){:root[data-theme=system]{
+${LIGHT}
+}}
 /* Paper is white: printing goes back to ink on white rather than spend a
-   cartridge on the night sky, or lose the text when backgrounds are dropped. */
-@media print{:root{color-scheme:light;
+   cartridge on a dark page, or lose the text when backgrounds are dropped.
+   :root[data-theme] so it outranks either theme. */
+@media print{:root,:root[data-theme]{color-scheme:light;
   --bg:#fff; --ink:#141a26; --muted:#5f6674; --faint:#98a0ad; --line:#d7dbe2; --line-2:#c3c9d4;
-  --surface:#fff; --surface-2:#f2f3f6; --accent:#1d4ed8;
+  --surface:#fff; --surface-2:#f2f3f6; --accent:#1d4ed8; --ok:#357353; --on-ink:#fff;
+  --wash:20 26 38; --tip-bg:#fff; --dg-hot-soft:#e8edf5; --dg-seq-num-ink:#fff;
+  --v-get:#2f5f93; --v-post:#2f6f4c; --v-put:#8a5a16; --v-patch:#644aa0; --v-delete:#9c3a3a; --v-other:#5f6674;
+  --hl-key:#2f5f93; --hl-str:#3a6e4c; --hl-num:#8a5a16; --hl-lit:#644aa0; --hl-kw:#2f5f93;
+  --hl-type:#2a6b72; --hl-fn:#644aa0; --hl-var:#94416a; --hl-com:#8a91a0;
   --code-bg:#f5f6f9; --code-bg-on-white:#f5f6f9; --code-bg-table:#f1f3f8; --code-ring:rgba(20,26,38,.1);
   --code-ink:#3a3d78; --code-var:#7a5a1e; --code-text:#2a3040;
   --dg-node:#fff; --dg-node-line:#c3c9d4; --dg-edge:#8a91a0; --dg-edge-text:#5f6674;
@@ -68,15 +153,10 @@ body{margin:0;background:var(--bg);color:var(--ink);
   font:15px/1.7 var(--font);
   font-optical-sizing:auto;
   -webkit-font-smoothing:antialiased}
-/* the night sky the page sits on: a blue glow in the top corner and two
-   sparse grids of stars, sized so they never line up into a visible pattern */
-body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:
-    radial-gradient(55% 45% at 100% 0%,rgba(30,111,255,.11),transparent 70%),
-    radial-gradient(40% 40% at 0% 100%,rgba(30,111,255,.05),transparent 70%),
-    radial-gradient(circle,rgba(255,255,255,.14) 0 .7px,transparent 1.2px) 13px 29px/173px 157px,
-    radial-gradient(circle,rgba(255,255,255,.09) 0 .6px,transparent 1.1px) 61px 7px/241px 211px,
-    radial-gradient(circle,rgba(77,163,255,.16) 0 .6px,transparent 1.1px) 137px 71px/311px 283px}
+/* the light the page sits in: one faint glow in the top corner, the theme's
+   (--sky). No stars or grain - anything textured behind text is noise the eye
+   has to keep filtering out. */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--sky)}
 a{color:inherit;text-decoration:none}
 .layout{display:grid;grid-template-columns:var(--rail) 1fr;min-height:100vh}
 .layout.collapsed{--rail:0px}
@@ -133,7 +213,7 @@ a{color:inherit;text-decoration:none}
   --ride-out:linear(0,.041 4.9%,.117 9.9%,.228 14.8%,.364 19.8%,.505 24.7%,.636 29.6%,.751 34.6%,.848 39.5%,.931 44.5%,1 49.4%,1);
   --ride-in:linear(0,0 15.9%,.238 24.3%,.453 32.7%,.621 41.1%,.746 49.5%,.838 58%,.904 66.4%,.949 74.8%,.979 83.2%,.995 91.6%,1)}
 .side-btn::before{content:"";position:absolute;inset:-1px;z-index:-1;border:1px solid var(--line-2);
-  border-radius:inherit;background:var(--surface);box-shadow:0 6px 18px -8px rgba(0,0,0,.8);
+  border-radius:inherit;background:var(--surface);box-shadow:0 6px 18px -8px rgb(var(--shadow) / calc(.8 * var(--shadow-k)));
   opacity:0;transition:background .15s}
 .collapsed .side-btn{transform:none}
 .collapsed .side-btn::before{opacity:1}
@@ -164,7 +244,7 @@ a{color:inherit;text-decoration:none}
 .item{position:relative;display:flex;align-items:center;gap:10px;padding:7px 10px 7px 14px;
   border-radius:999px;cursor:pointer;color:var(--muted);transition:color .12s,background .12s,box-shadow .12s}
 .item:hover{color:var(--ink);background:var(--hover)}
-.item.active{color:var(--ink);background:rgba(255,255,255,.035);box-shadow:inset 0 0 0 1px var(--line-2)}
+.item.active{color:var(--ink);background:rgb(var(--wash) / .035);box-shadow:inset 0 0 0 1px var(--line-2)}
 .num{flex:none;min-width:15px;font-size:11px;font-weight:var(--semi);color:var(--faint);
   font-variant-numeric:tabular-nums;transition:color .12s}
 .item:hover .num{color:var(--muted)}
@@ -238,22 +318,22 @@ export const CSS_MAIN = `
   margin:28px auto 34px;padding:46px var(--gutter) 48px;border:1px solid transparent;border-radius:24px;
   overflow-wrap:break-word;
   background:
-    radial-gradient(90% 140% at var(--lamp),rgba(115,185,255,.52),rgba(86,159,255,.442) 17%,
-      rgba(58,133,255,.284) 33%,rgba(45,119,255,.146) 50%,rgba(34,106,255,.058) 67%,rgba(28,100,255,.013) 83%,
+    radial-gradient(90% 140% at var(--lamp),rgb(var(--glow-face) / calc(.52 * var(--glow-k))),rgb(var(--glow-face) / calc(.442 * var(--glow-k))) 17%,
+      rgb(var(--glow-face) / calc(.284 * var(--glow-k))) 33%,rgb(var(--glow-face) / calc(.146 * var(--glow-k))) 50%,rgb(var(--glow-face) / calc(.058 * var(--glow-k))) 67%,rgb(var(--glow-face) / calc(.013 * var(--glow-k))) 83%,
       transparent) padding-box,
-    linear-gradient(rgba(255,255,255,.02),transparent 45%) padding-box,
+    linear-gradient(var(--card-sheen),transparent 45%) padding-box,
     linear-gradient(var(--surface),var(--surface)) padding-box,
-    radial-gradient(circle 160px at var(--bend-tl),rgba(150,205,255,.6),rgba(140,197,255,.364) 6%,
-      rgba(126,186,255,.205) 14%,rgba(106,171,255,.106) 25%,
-      rgba(80,150,255,.046) 40%,rgba(60,133,255,.013) 60%,transparent) border-box,
-    radial-gradient(circle 160px at var(--bend-br),rgba(150,205,255,.48),rgba(140,197,255,.291) 6%,
-      rgba(126,186,255,.164) 14%,rgba(106,171,255,.085) 25%,
-      rgba(80,150,255,.037) 40%,rgba(60,133,255,.01) 60%,transparent) border-box,
-    radial-gradient(150% 150% at var(--lamp),rgba(150,205,255,.85),rgba(133,191,255,.681) 10%,
-      rgba(115,178,255,.543) 20%,rgba(98,164,255,.427) 30%,rgba(80,150,255,.33) 40%,rgba(70,141,255,.248) 50%,
-      rgba(60,133,255,.178) 60%,rgba(50,124,255,.12) 70%,rgba(40,115,255,.071) 80%,rgba(40,115,255,.032) 90%,
+    radial-gradient(circle 160px at var(--bend-tl),rgb(var(--glow-rim) / calc(.6 * var(--glow-k))),rgb(var(--glow-rim) / calc(.364 * var(--glow-k))) 6%,
+      rgb(var(--glow-rim) / calc(.205 * var(--glow-k))) 14%,rgb(var(--glow-rim) / calc(.106 * var(--glow-k))) 25%,
+      rgb(var(--glow-rim) / calc(.046 * var(--glow-k))) 40%,rgb(var(--glow-rim) / calc(.013 * var(--glow-k))) 60%,transparent) border-box,
+    radial-gradient(circle 160px at var(--bend-br),rgb(var(--glow-rim) / calc(.48 * var(--glow-k))),rgb(var(--glow-rim) / calc(.291 * var(--glow-k))) 6%,
+      rgb(var(--glow-rim) / calc(.164 * var(--glow-k))) 14%,rgb(var(--glow-rim) / calc(.085 * var(--glow-k))) 25%,
+      rgb(var(--glow-rim) / calc(.037 * var(--glow-k))) 40%,rgb(var(--glow-rim) / calc(.01 * var(--glow-k))) 60%,transparent) border-box,
+    radial-gradient(150% 150% at var(--lamp),rgb(var(--glow-rim) / calc(.85 * var(--glow-k))),rgb(var(--glow-rim) / calc(.681 * var(--glow-k))) 10%,
+      rgb(var(--glow-rim) / calc(.543 * var(--glow-k))) 20%,rgb(var(--glow-rim) / calc(.427 * var(--glow-k))) 30%,rgb(var(--glow-rim) / calc(.33 * var(--glow-k))) 40%,rgb(var(--glow-rim) / calc(.248 * var(--glow-k))) 50%,
+      rgb(var(--glow-rim) / calc(.178 * var(--glow-k))) 60%,rgb(var(--glow-rim) / calc(.12 * var(--glow-k))) 70%,rgb(var(--glow-rim) / calc(.071 * var(--glow-k))) 80%,rgb(var(--glow-rim) / calc(.032 * var(--glow-k))) 90%,
       transparent) border-box,
-    linear-gradient(rgba(255,255,255,.13),rgba(255,255,255,.06) 55%,rgba(255,255,255,.05)) border-box;
+    linear-gradient(var(--card-edge-1),var(--card-edge-2) 55%,var(--card-edge-3)) border-box;
   background-repeat:no-repeat}
 /* the two drifting copies: each lights the edge fully, and the face by half
    near the light and not at all by the far corners, so the more light it
@@ -264,18 +344,18 @@ export const CSS_MAIN = `
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:head-lamp 13s ease-in-out infinite alternate}
 .head::before{background:
-  radial-gradient(circle 160px at var(--bend-br),rgba(150,205,255,.3),rgba(140,197,255,.182) 6%,
-    rgba(126,186,255,.102) 14%,rgba(106,171,255,.053) 25%,
-    rgba(80,150,255,.023) 40%,rgba(60,133,255,.006) 60%,transparent) border-box,
+  radial-gradient(circle 160px at var(--bend-br),rgb(var(--glow-rim) / calc(.3 * var(--glow-k))),rgb(var(--glow-rim) / calc(.182 * var(--glow-k))) 6%,
+    rgb(var(--glow-rim) / calc(.102 * var(--glow-k))) 14%,rgb(var(--glow-rim) / calc(.053 * var(--glow-k))) 25%,
+    rgb(var(--glow-rim) / calc(.023 * var(--glow-k))) 40%,rgb(var(--glow-rim) / calc(.006 * var(--glow-k))) 60%,transparent) border-box,
   radial-gradient(70% 120% at 96px calc(100% + 24px),
-    rgba(115,185,255,.16),rgba(72,146,255,.107) 25%,rgba(45,119,255,.04) 50%,rgba(28,100,255,.008) 75%,
+    rgb(var(--glow-face) / calc(.16 * var(--glow-k))),rgb(var(--glow-face) / calc(.107 * var(--glow-k))) 25%,rgb(var(--glow-face) / calc(.04 * var(--glow-k))) 50%,rgb(var(--glow-face) / calc(.008 * var(--glow-k))) 75%,
     transparent) border-box;background-repeat:no-repeat}
 .head::after{background:
-  radial-gradient(circle 160px at var(--bend-tl),rgba(150,205,255,.3),rgba(140,197,255,.182) 6%,
-    rgba(126,186,255,.102) 14%,rgba(106,171,255,.053) 25%,
-    rgba(80,150,255,.023) 40%,rgba(60,133,255,.006) 60%,transparent) border-box,
+  radial-gradient(circle 160px at var(--bend-tl),rgb(var(--glow-rim) / calc(.3 * var(--glow-k))),rgb(var(--glow-rim) / calc(.182 * var(--glow-k))) 6%,
+    rgb(var(--glow-rim) / calc(.102 * var(--glow-k))) 14%,rgb(var(--glow-rim) / calc(.053 * var(--glow-k))) 25%,
+    rgb(var(--glow-rim) / calc(.023 * var(--glow-k))) 40%,rgb(var(--glow-rim) / calc(.006 * var(--glow-k))) 60%,transparent) border-box,
   radial-gradient(70% 120% at -24px calc(100% - 26px),
-    rgba(115,185,255,.16),rgba(72,146,255,.107) 25%,rgba(45,119,255,.04) 50%,rgba(28,100,255,.008) 75%,
+    rgb(var(--glow-face) / calc(.16 * var(--glow-k))),rgb(var(--glow-face) / calc(.107 * var(--glow-k))) 25%,rgb(var(--glow-face) / calc(.04 * var(--glow-k))) 50%,rgb(var(--glow-face) / calc(.008 * var(--glow-k))) 75%,
     transparent) border-box;background-repeat:no-repeat;animation-duration:19s;animation-delay:-8s}
 @keyframes head-lamp{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.head::before,.head::after{animation:none}}
@@ -295,7 +375,7 @@ export const CSS_MAIN = `
   background:var(--surface);border:1px solid var(--line);border-radius:18px;
   transition:background .2s ease,border-color .2s ease}
 .docnav-btn:hover{border-color:var(--line-2);
-  background:radial-gradient(110% 140% at 100% 0%,rgba(77,163,255,.13),transparent 60%),var(--surface-2)}
+  background:radial-gradient(110% 140% at 100% 0%,color-mix(in srgb,var(--accent) 13%,transparent),transparent 60%),var(--surface-2)}
 .docnav-btn.next{grid-column:2;text-align:right}
 .docnav-label{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
 .docnav-title{font-size:14px;font-weight:var(--semi);letter-spacing:-.01em;color:var(--ink);
@@ -354,7 +434,7 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
 .sec.is-lit::after{content:"";position:absolute;z-index:-1;pointer-events:none;
   top:-14px;bottom:-14px;left:calc(0px - var(--lit-l,16px));right:calc(0px - var(--lit-r,16px));
   border:1px solid var(--accent-ring);border-radius:16px;
-  background:linear-gradient(var(--accent-soft),rgba(77,163,255,.025) 260px);
+  background:linear-gradient(var(--accent-soft),color-mix(in srgb,var(--accent) 2.5%,transparent) 260px);
   box-shadow:0 0 24px -6px var(--accent-ring);
   animation:sec-lit 2.4s ease-in-out both}
 /* a chapter's box starts at the rule above it; the ring starts at its heading */
@@ -424,12 +504,14 @@ h4.sec-head,h5.sec-head,h6.sec-head{margin:0 0 8px;font-size:14px;font-weight:va
   font-weight:750;font-size:.78em;letter-spacing:.04em;padding:.14em .44em .12em;vertical-align:.04em}
 /* one colour per verb, as a family: ink for text, a soft fill and a ring for
    plates, and a solid for the badge on a call's header */
-.m-get{--m-ink:#8ab8ff;--m-soft:rgba(80,140,255,.14);--m-ring:rgba(80,140,255,.38);--m-solid:#3b82f6}
-.m-post{--m-ink:#7ee3a6;--m-soft:rgba(110,231,160,.13);--m-ring:rgba(110,231,160,.38);--m-solid:#22c55e}
-.m-put{--m-ink:#fbc078;--m-soft:rgba(251,180,90,.13);--m-ring:rgba(251,180,90,.38);--m-solid:#f59e0b}
-.m-patch{--m-ink:#bfa8ff;--m-soft:rgba(160,130,255,.15);--m-ring:rgba(160,130,255,.4);--m-solid:#8b5cf6}
-.m-delete{--m-ink:#ff9393;--m-soft:rgba(255,110,110,.14);--m-ring:rgba(255,110,110,.4);--m-solid:#ef4444}
-.m-head,.m-options{--m-ink:#b4bcc8;--m-soft:rgba(255,255,255,.07);--m-ring:rgba(255,255,255,.2);--m-solid:#6b7280}
+.m-get{--m-ink:var(--v-get)}
+.m-post{--m-ink:var(--v-post)}
+.m-put{--m-ink:var(--v-put)}
+.m-patch{--m-ink:var(--v-patch)}
+.m-delete{--m-ink:var(--v-delete)}
+.m-head,.m-options{--m-ink:var(--v-other)}
+.m-get,.m-post,.m-put,.m-patch,.m-delete,.m-head,.m-options{
+  --m-soft:color-mix(in srgb,var(--m-ink) 13%,transparent);--m-ring:color-mix(in srgb,var(--m-ink) 38%,transparent)}
 .doc del{color:var(--faint)}
 .doc img{max-width:100%;border-radius:14px}
 
@@ -458,7 +540,7 @@ tbody tr:last-child td{border-bottom:0}
 .doc td code{font-size:12.5px;letter-spacing:-.005em;font-weight:500;color:var(--code-ink);
   background:var(--code-bg-table);box-shadow:none;padding:.2em .5em .22em;border-radius:6px;white-space:normal}
 .doc th code{font-size:11.5px;letter-spacing:0;text-transform:none;font-weight:var(--semi);color:var(--muted);
-  background:rgba(255,255,255,.06);box-shadow:none;padding:.12em .42em}
+  background:var(--code-bg-table);box-shadow:none;padding:.12em .42em}
 
 /* ---- api calls ----
    A call is a neutral box: a solid badge in the colour of its verb, the url
@@ -504,7 +586,7 @@ tbody tr:last-child td{border-bottom:0}
 .api-row dd li{margin:2px 0}
 .api-tip-key{margin-bottom:5px}
 .api-tip-key code{font-weight:var(--semi);color:var(--ink)}
-.dg-tip.api-tip .c-var{color:#f3c77b;font-style:normal}
+.dg-tip.api-tip .c-var{color:var(--code-var);font-style:normal}
 .dg-tip.api-tip ul{margin:5px 0 0;padding-left:16px}
 /* ---- http examples ----
    The same box as a call, with the example's own parts under the header: the
@@ -516,8 +598,8 @@ tbody tr:last-child td{border-bottom:0}
 .http-msg+.http-msg{border-top:1px solid var(--line)}
 /* the response, when it follows the request in the same box: set a step
    back, so the two read as what was sent and what came back */
-.http-msg.is-res:not(:first-child){background:rgba(255,255,255,.015)}
-.http-msg.is-res:not(:first-child) .http-headers{background:rgba(255,255,255,.03)}
+.http-msg.is-res:not(:first-child){background:rgb(var(--wash) / .015)}
+.http-msg.is-res:not(:first-child) .http-headers{background:rgb(var(--wash) / .03)}
 .http-head{display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 14px 8px 15px}
 .http-reason{flex:1;min-width:0;font-size:13.5px;font-weight:var(--semi);color:var(--ink)}
 .http-kind{flex:none;font-size:10px;font-weight:var(--bold);letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
@@ -531,22 +613,22 @@ tbody tr:last-child td{border-bottom:0}
 .doc .http-body code,.doc pre.code code{font-size:12.5px;line-height:1.65;white-space:pre;letter-spacing:0;
   background:none;box-shadow:none;border-radius:0;padding:0;color:var(--code-text)}
 /* json */
-.j-key{color:#9ecbff}
-.j-str{color:#7ee3a6}
-.j-num{color:#fbc078}
-.j-lit{color:#c4a8ff;font-weight:var(--semi)}
+.j-key{color:var(--hl-key)}
+.j-str{color:var(--hl-str)}
+.j-num{color:var(--hl-num)}
+.j-lit{color:var(--hl-lit);font-weight:var(--semi)}
 .j-pun{color:var(--faint)}
 /* sql: keywords carry the statement's shape, so they get the weight; names
    stay in the ink, and what is data - strings, numbers - takes the colours
    JSON uses for the same things */
-.s-kw{color:#8ab8ff;font-weight:600}
-.s-type{color:#67d4e6}
-.s-fn{color:#c4a8ff}
-.s-str{color:#7ee3a6}
-.s-num{color:#fbc078}
-.s-var{color:#f49ac1}
+.s-kw{color:var(--hl-kw);font-weight:600}
+.s-type{color:var(--hl-type)}
+.s-fn{color:var(--hl-fn)}
+.s-str{color:var(--hl-str)}
+.s-num{color:var(--hl-num)}
+.s-var{color:var(--hl-var)}
 .s-id{color:var(--code-text)}
-.s-com{color:#6b7480;font-style:italic}
+.s-com{color:var(--hl-com);font-style:italic}
 .s-pun{color:var(--muted)}
 @media (max-width:640px){
   .api-title,.http-kind{display:none}
@@ -556,7 +638,7 @@ tbody tr:last-child td{border-bottom:0}
 
 /* ---- misc ---- */
 .empty{padding:60px var(--gutter);width:100%;max-width:var(--column);margin-inline:auto;color:var(--muted)}
-mark{background:rgba(77,163,255,.22);color:var(--ink);border-radius:3px;padding:0 2px}
+mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--ink);border-radius:3px;padding:0 2px}
 @media (max-width:820px){
   .layout:not(.collapsed) .main{display:none}
   :root{--gutter:20px}
@@ -755,11 +837,11 @@ svg.dg text.dg-er-def{fill:var(--dg-text-2);font-family:var(--mono);font-size:10
 @keyframes dg-fade-in{from{opacity:0}}
 /* what an entity is for, shown while the pointer is on it */
 .dg-tip{position:fixed;z-index:70;max-width:min(440px,calc(100vw - 16px));padding:9px 12px;text-align:left;
-  font-size:12.5px;line-height:1.5;color:var(--ink);background:#20252c;border:1px solid var(--line-2);border-radius:12px;
-  pointer-events:none;box-shadow:0 14px 36px -12px rgba(0,0,0,.7);animation:dg-fade-in .12s ease-out}
+  font-size:12.5px;line-height:1.5;color:var(--ink);background:var(--tip-bg);border:1px solid var(--line-2);border-radius:12px;
+  pointer-events:none;box-shadow:0 14px 36px -12px rgb(var(--shadow) / calc(.7 * var(--shadow-k)));animation:dg-fade-in .12s ease-out}
 .dg-tip p{margin:0}
 .dg-tip p+p{margin-top:6px}
-.dg-tip code{font-family:var(--mono);font-size:.88em;background:rgba(255,255,255,.13);border-radius:4px;padding:.05em .3em}
+.dg-tip code{font-family:var(--mono);font-size:.88em;background:rgb(var(--wash) / .11);border-radius:4px;padding:.05em .3em}
 @media print{.dg-er-more,.dg-tip{display:none}}
 
 /* ---- sequences ----
@@ -776,8 +858,8 @@ svg.dg text.dg-er-def{fill:var(--dg-text-2);font-family:var(--mono);font-size:10
 .dg-seq-text{fill:var(--dg-text-2)}
 .dg-head-line{fill:none;stroke:var(--dg-edge);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
 .dg-seq-num{fill:var(--dg-seq-num);stroke:var(--surface);stroke-width:1.5}
-.dg-seq-num-text{fill:#fff;font-size:9.6px;font-weight:620}
-.dg-seq-frame{fill:rgba(255,255,255,.015);stroke:var(--dg-life);stroke-width:1}
+.dg-seq-num-text{fill:var(--dg-seq-num-ink);font-size:9.6px;font-weight:620}
+.dg-seq-frame{fill:rgb(var(--wash) / .015);stroke:var(--dg-life);stroke-width:1}
 .dg-seq-split{stroke:var(--dg-tie);stroke-width:1;stroke-dasharray:5 4}
 .dg-seq-tab{fill:var(--dg-er-badge);stroke:var(--dg-life);stroke-width:1}
 .dg-seq-kw{fill:var(--dg-er-badge-ink);font-size:9.4px;font-weight:620;letter-spacing:.05em}
@@ -801,18 +883,23 @@ svg.dg.has-hot .dg-seq-notes,svg.dg.has-hot .dg-seq-marks{opacity:.4}
 .dg-el.is-hot .dg-seq-text{fill:var(--dg-hot)}
 /* the participant row that rides along the top of a long sequence */
 .dg-float{position:absolute;left:0;right:0;top:0;z-index:3;pointer-events:none;opacity:0;visibility:hidden;
-  background:rgba(19,22,27,.93);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);
-  box-shadow:0 8px 16px -12px rgba(0,0,0,.6);transition:opacity .15s ease,visibility .15s}
+  background:color-mix(in srgb,var(--surface) 93%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);
+  box-shadow:0 8px 16px -12px rgb(var(--shadow) / calc(.6 * var(--shadow-k)));transition:opacity .15s ease,visibility .15s}
 .dg-float.on{opacity:1;visibility:visible}
 .dg-float svg.dg{position:absolute;top:0;margin:0;max-width:none}
 .dg-float.on .dg-node{pointer-events:auto;cursor:pointer}
 
-/* a box given a light fill by a classDef, written for a light page: its text
-   goes dark, so the fill still reads as the author meant it */
+/* a box given its own fill by a classDef: the text takes whichever ink reads
+   on that fill, not the theme's - dark on a light fill (written, most likely,
+   for a light page), light on a dark one - so the fill reads as the author
+   meant it whichever theme the page is in */
 svg.dg .dg-node.on-light text{fill:#141a26}
 svg.dg .dg-node.on-light .dg-er-type,svg.dg .dg-node.on-light .dg-er-comment,
 svg.dg .dg-node.on-light .dg-er-ref,svg.dg .dg-node.on-light .dg-er-x-label{fill:#4f5664}
-svg.dg .dg-node.on-light .dg-er-key{fill:var(--dg-er-badge-ink)}
+svg.dg .dg-node.on-dark text{fill:#ecebe7}
+svg.dg .dg-node.on-dark .dg-er-type,svg.dg .dg-node.on-dark .dg-er-comment,
+svg.dg .dg-node.on-dark .dg-er-ref,svg.dg .dg-node.on-dark .dg-er-x-label{fill:#b9b6af}
+svg.dg .dg-node.on-light .dg-er-key,svg.dg .dg-node.on-dark .dg-er-key{fill:var(--dg-er-badge-ink)}
 
 @media print{svg.dg.has-hot .dg-el{opacity:1}
   svg.dg.has-hot .dg-seq-boxes,svg.dg.has-hot .dg-seq-frames,
@@ -821,7 +908,7 @@ svg.dg .dg-node.on-light .dg-er-key{fill:var(--dg-er-badge-ink)}
 `;
 
 export const CSS_LIGHTBOX = `
-.lightbox{position:fixed;inset:0;z-index:50;display:none;background:rgba(8,9,11,.94);
+.lightbox{position:fixed;inset:0;z-index:50;display:none;background:color-mix(in srgb,var(--bg) 95%,transparent);
   backdrop-filter:blur(8px);cursor:grab}
 .lightbox.on{display:block}
 .lightbox.drag{cursor:grabbing}
@@ -844,19 +931,19 @@ export const CSS_CMT = `
    A highlight and its card are two views of one comment, so hovering either
    lights both (.hot); clicking either pins the pair (.on). */
 .body-wrap{position:relative;display:flex;flex-direction:column;min-height:100vh}
-.cmt-hl{background:rgba(77,163,255,.16);box-shadow:inset 0 -1px 0 rgba(77,163,255,.6);border-radius:3px;padding:0 1px;
+.cmt-hl{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--accent) 60%,transparent);border-radius:3px;padding:0 1px;
   color:inherit;cursor:pointer;transition:background .12s,box-shadow .12s}
-.cmt-hl.hot{background:rgba(77,163,255,.26);box-shadow:inset 0 -1px 0 rgba(77,163,255,.8)}
-.cmt-hl.on{background:rgba(77,163,255,.36);box-shadow:inset 0 -1px 0 var(--accent)}
+.cmt-hl.hot{background:color-mix(in srgb,var(--accent) 26%,transparent);box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--accent) 80%,transparent)}
+.cmt-hl.on{background:color-mix(in srgb,var(--accent) 34%,transparent);box-shadow:inset 0 -1px 0 var(--accent)}
 .cmt-layer{position:absolute;inset:0;pointer-events:none;z-index:2}
 .cmt-card{position:absolute;left:0;top:0;width:var(--cmt-w,264px);pointer-events:auto;padding:10px 12px;
   background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;
   font-size:12.5px;line-height:1.55;transition:border-color .15s ease,box-shadow .15s ease}
-.cmt-card.hot{border-color:rgba(77,163,255,.45);box-shadow:0 4px 16px rgba(0,0,0,.4)}
-.cmt-card.on{border-color:rgba(77,163,255,.7);box-shadow:0 6px 20px rgba(0,0,0,.5)}
+.cmt-card.hot{border-color:color-mix(in srgb,var(--accent) 45%,transparent);box-shadow:0 4px 16px rgb(var(--shadow) / calc(.4 * var(--shadow-k)))}
+.cmt-card.on{border-color:color-mix(in srgb,var(--accent) 70%,transparent);box-shadow:0 6px 20px rgb(var(--shadow) / calc(.5 * var(--shadow-k)))}
 .cmt-card[hidden]{display:none!important}
 .cmt-face{display:none}
-.cmt-quote{margin:0 0 7px;padding-left:9px;border-left:2px solid rgba(77,163,255,.6);color:var(--muted);
+.cmt-quote{margin:0 0 7px;padding-left:9px;border-left:2px solid color-mix(in srgb,var(--accent) 60%,transparent);color:var(--muted);
   font-size:11.5px;line-height:1.45;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .cmt-text{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -869,20 +956,20 @@ export const CSS_CMT = `
 
 /* tight gutters: the card shrinks to a numbered dot, opened as a popover */
 .cmt-layer.dots .cmt-card{width:22px;height:22px;padding:0;border-radius:50%;
-  background:#10284d;border-color:#2f6db3;display:grid;place-items:center;overflow:hidden}
-.cmt-layer.dots .cmt-card.hot,.cmt-layer.dots .cmt-card.on{background:#16386b;border-color:var(--accent)}
+  background:var(--dg-hot-soft);border-color:color-mix(in srgb,var(--accent) 60%,transparent);display:grid;place-items:center;overflow:hidden}
+.cmt-layer.dots .cmt-card.hot,.cmt-layer.dots .cmt-card.on{background:color-mix(in srgb,var(--accent) 28%,transparent);border-color:var(--accent)}
 .cmt-layer.dots .cmt-full{display:none}
-.cmt-layer.dots .cmt-face{display:block;font-size:11px;font-weight:var(--bold);color:#a9d2ff;
+.cmt-layer.dots .cmt-face{display:block;font-size:11px;font-weight:var(--bold);color:var(--accent);
   font-variant-numeric:tabular-nums}
 
 /* ---- comments: floating bits ---- */
 .cmt-add{position:fixed;z-index:9;padding:5px 13px;background:var(--ink);color:var(--on-ink);border:0;
   border-radius:999px;font:inherit;font-size:12px;font-weight:var(--semi);cursor:pointer;
-  box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  box-shadow:0 4px 16px rgb(var(--shadow) / calc(.5 * var(--shadow-k)))}
 .cmt-add:hover{background:var(--ink-hover)}
 .cmt-pop{position:fixed;z-index:9;width:290px;max-width:calc(100vw - 24px);padding:12px;
   background:var(--surface-2);border:1px solid var(--line-2);border-radius:16px;font-size:12.5px;
-  line-height:1.55;box-shadow:0 14px 40px rgba(0,0,0,.6)}
+  line-height:1.55;box-shadow:0 14px 40px rgb(var(--shadow) / calc(.6 * var(--shadow-k)))}
 .cmt-pop textarea{display:block;width:100%;min-height:80px;margin:0 0 9px;padding:8px 10px;
   border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);
   font:inherit;font-size:12.5px;line-height:1.55;resize:vertical;outline:none}
@@ -891,12 +978,12 @@ export const CSS_CMT = `
 .cmt-row .cmt-spacer{flex:1}
 .cmt-btn{padding:5px 13px;border:1px solid var(--line-2);border-radius:999px;background:transparent;
   color:var(--ink);font:inherit;font-size:12px;cursor:pointer;transition:.15s}
-.cmt-btn:hover{background:var(--hover);border-color:rgba(255,255,255,.32)}
+.cmt-btn:hover{background:var(--hover);border-color:rgb(var(--wash) / .32)}
 .cmt-btn.go{background:var(--ink);border-color:var(--ink);color:var(--on-ink);font-weight:var(--semi)}
 .cmt-btn.go:hover{background:var(--ink-hover);border-color:var(--ink-hover)}
 .cmt-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:10;padding:8px 16px;
   background:var(--ink);color:var(--on-ink);border-radius:999px;font-size:12.5px;font-weight:var(--semi);
-  box-shadow:0 8px 26px rgba(0,0,0,.55)}
+  box-shadow:0 8px 26px rgb(var(--shadow) / calc(.55 * var(--shadow-k)))}
 @media print{.cmt-layer,.cmt-add,.cmt-pop,.cmt-toast{display:none}}
 `;
 
@@ -905,12 +992,12 @@ export const CSS_CMT = `
    little, so a change is still seen on the documents as it is made, and it
    takes the click that closes the dialog, so that click lands on nothing else. */
 export const CSS_SETTINGS = `
-.settings-veil{position:fixed;inset:0;z-index:39;background:rgba(4,5,7,.42);animation:dg-fade-in .16s ease-out}
+.settings-veil{position:fixed;inset:0;z-index:39;background:rgb(var(--shadow) / calc(.42 * var(--shadow-k)));animation:dg-fade-in .16s ease-out}
 .settings-veil[hidden]{display:none}
 .settings{position:fixed;z-index:40;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;
   max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow-y:auto;padding:16px 18px;
   background:var(--surface-2);border:1px solid var(--line-2);border-radius:20px;
-  box-shadow:0 24px 60px -16px rgba(0,0,0,.8);
+  box-shadow:0 24px 60px -16px rgb(var(--shadow) / calc(.8 * var(--shadow-k)));
   font-size:13px;line-height:1.45;animation:settings-in .16s ease-out}
 @keyframes settings-in{from{opacity:0;transform:translate(-50%,calc(-50% + 6px))}}
 .settings[hidden]{display:none}
@@ -935,8 +1022,18 @@ export const CSS_SETTINGS = `
 .switch[aria-checked=true]{background:var(--accent);border-color:var(--accent)}
 .switch[aria-checked=true]::after{transform:translateX(14px);background:var(--on-ink)}
 .switch:focus-visible{outline:2px solid var(--accent-ring);outline-offset:2px}
+/* one of a few: a pill split into options, the chosen one lit */
+.seg{display:flex;gap:2px;padding:2px;border:1px solid var(--line-2);border-radius:999px}
+.seg button{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:5px 8px;
+  border:0;border-radius:999px;background:none;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer;
+  transition:background .15s,color .15s,box-shadow .15s}
+.seg button svg{flex:none;width:13px;height:13px}
+.seg button:hover{color:var(--ink);background:var(--hover)}
+.seg button[aria-checked=true]{color:var(--ink);font-weight:var(--semi);background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px var(--accent-ring)}
+.seg button:focus-visible{outline:2px solid var(--accent-ring);outline-offset:1px}
 .settings-foot{padding-top:9px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
-.settings-foot.bad{color:#ff9393}
+.settings-foot.bad{color:var(--bad)}
 .settings-foot code{font-family:var(--mono);font-size:.92em}
 @media print{.settings,.settings-veil{display:none}}
 `;

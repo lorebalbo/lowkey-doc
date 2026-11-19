@@ -8,7 +8,7 @@ export const LIVE_CSS = `
 .live{position:fixed;right:16px;bottom:16px;z-index:12;display:flex;align-items:center;gap:7px;
   max-width:min(520px,calc(100vw - 32px));padding:5px 11px 5px 9px;border:1px solid var(--line);
   border-radius:999px;background:var(--surface);color:var(--muted);font-size:12px;line-height:1.4;
-  box-shadow:0 4px 16px rgba(0,0,0,.45);opacity:.72;transition:opacity .2s,border-color .2s,color .2s}
+  box-shadow:0 4px 16px rgb(var(--shadow) / calc(.45 * var(--shadow-k)));opacity:.72;transition:opacity .2s,border-color .2s,color .2s}
 .live:hover,.live.news,.live.bad,.live.off{opacity:1}
 .live-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent-ring)}
 .live.off .live-dot{background:var(--faint);box-shadow:none}
@@ -16,13 +16,13 @@ export const LIVE_CSS = `
 .live.go{cursor:pointer}
 .live.go:hover{color:var(--ink);border-color:var(--line-2)}
 .live.news{color:var(--ink)}
-.live.bad{align-items:flex-start;border-color:rgba(255,110,110,.4);border-radius:14px;color:#ff9a9a}
-.live.bad .live-dot{margin-top:5px;background:#ef4444;box-shadow:none}
+.live.bad{align-items:flex-start;border-color:color-mix(in srgb,var(--bad) 45%,transparent);border-radius:14px;color:var(--bad)}
+.live.bad .live-dot{margin-top:5px;background:var(--bad);box-shadow:none}
 .live.bad .live-msg{white-space:pre-wrap;font-family:var(--mono);font-size:11.5px}
 .dc-changed{animation:dc-changed 2.6s ease-out 1}
 @keyframes dc-changed{
-  0%,30%{background-color:rgba(77,163,255,.2);box-shadow:0 0 0 4px rgba(77,163,255,.2)}
-  100%{background-color:rgba(77,163,255,0);box-shadow:0 0 0 4px rgba(77,163,255,0)}}
+  0%,30%{background-color:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft)}
+  100%{background-color:transparent;box-shadow:0 0 0 4px transparent}}
 .diagram.dc-redraw .diagram-out{opacity:.45;transition:opacity .2s}
 @media print{.live{display:none}}
 `;

@@ -1324,14 +1324,65 @@ export const APP_JS = String.raw`
     setMarginAuto.disabled = auto;
   }
 
+  /* The theme is the reader's own, like the comments switch: kept in this
+     browser, never written to the project. The project's (CFG.theme) is what
+     a reader sees until they pick; the page's head has already put their pick
+     on the root before the first frame, so here it only has to be shown. */
+  var THEMES = ['light', 'dark', 'system'];
+  var setTheme = document.getElementById('set-theme');
+  var setThemeVal = document.getElementById('set-theme-val');
+  var themeBtns = [].slice.call(setTheme.querySelectorAll('[data-pick]'));
+  var lightOs = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+
+  function themePicked(){ var t = recall('theme'); return THEMES.indexOf(t) >= 0 ? t : null; }
+  function themeChosen(){ return themePicked() || (THEMES.indexOf(CFG.theme) >= 0 ? CFG.theme : 'system'); }
+  function showTheme(){
+    var t = themeChosen();
+    themeBtns.forEach(function(b){
+      var on = b.getAttribute('data-pick') === t;
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+    });
+    setThemeVal.textContent = t !== 'system' ? ''
+      : 'Now ' + (lightOs && lightOs.matches ? 'light' : 'dark');
+  }
+  function applyTheme(){
+    document.documentElement.setAttribute('data-theme', themeChosen());
+    showTheme();
+    if (window.__diagrams && window.__diagrams.retheme) window.__diagrams.retheme();
+  }
+  function pickTheme(t){ keep('theme', t); applyTheme(); }
+
+  themeBtns.forEach(function(b){
+    b.addEventListener('click', function(){ pickTheme(b.getAttribute('data-pick')); });
+  });
+  // one stop on the tab order, and the arrows move the choice along it
+  setTheme.addEventListener('keydown', function(e){
+    var step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    var at = THEMES.indexOf(themeChosen());
+    var to = THEMES[(at + step + THEMES.length) % THEMES.length];
+    pickTheme(to);
+    themeBtns[THEMES.indexOf(to)].focus();
+  });
+  // the computer switching between light and dark, and a pick made in another tab
+  if (lightOs){
+    var osChanged = function(){ if (themeChosen() === 'system') applyTheme(); };
+    if (lightOs.addEventListener) lightOs.addEventListener('change', osChanged);
+    else if (lightOs.addListener) lightOs.addListener(osChanged);
+  }
+  window.addEventListener('storage', function(e){ if (e.key === NS + ':theme') applyTheme(); });
+  showTheme();
+
   function status(html, bad){
     setStatus.className = 'settings-foot' + (bad ? ' bad' : '');
     setStatus.innerHTML = html;
   }
   function idleStatus(){
-    status(app.save ? 'Changes are saved to the project, in <code>docs.config.json</code>.'
-      : 'Preview only: a page opened from its file cannot change the project. ' +
-        'Run <code>lowkey-doc --watch</code> to save changes.');
+    status(app.save ? 'Margins are saved to the project, in <code>docs.config.json</code>.'
+      : 'Margins are a preview here: a page opened from its file cannot change the project. ' +
+        'Run <code>lowkey-doc --watch</code> to save them.');
   }
 
   function changed(){
@@ -1359,7 +1410,8 @@ export const APP_JS = String.raw`
     idleStatus();
     setBox.hidden = setVeil.hidden = false;
     setBtn.setAttribute('aria-expanded', 'true');
-    setMarginIn.focus();
+    showTheme();
+    (themeBtns.filter(function(b){ return b.tabIndex === 0; })[0] || setMarginIn).focus();
   }
   function closeSettings(){ setBox.hidden = setVeil.hidden = true; setBtn.setAttribute('aria-expanded', 'false'); }
 
