@@ -653,6 +653,10 @@ svg.dg text{font-family:var(--font);dominant-baseline:middle}
 .dg-node-text{fill:var(--ink);font-size:12.5px}
 .dg-group-shape{fill:var(--dg-group);stroke:var(--dg-group-line);stroke-width:1}
 .dg-group-text{fill:var(--muted);font-size:12.5px;font-weight:560}
+/* the first line of a titled label, "<b>Title</b><br/>description": its size
+   and weight are TITLE_FS and TITLE_WEIGHT in diagrams.mjs, which measure it */
+.dg-node-text .dg-title,.dg-group-text .dg-title{font-size:14px;font-weight:600}
+.dg-group-text .dg-title{fill:var(--ink)}
 .dg-edge-line{fill:none;stroke:var(--dg-edge);stroke-width:1.3;stroke-linejoin:round}
 .dg-edge-hit{fill:none;stroke:transparent;stroke-width:14;stroke-linejoin:round;cursor:pointer}
 .dg-edge-text{fill:var(--dg-edge-text);font-size:11.5px}

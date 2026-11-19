@@ -183,6 +183,52 @@ export const DIAGRAMS_JS = String.raw`
     return { lines: out, w: Math.ceil(w), h: Math.ceil(out.length * lh), lh: lh };
   }
 
+  /* ------------------------------------------------------------ titles
+     A box or a group may carry a title over a description. A label whose first
+     line is wholly bold - "<b>Invited</b><br/>nothing granted yet" - is drawn
+     with that line larger and bold, and the lines after it as ordinary text.
+     Mermaid's own renderer bolds the same line, so the fallback reads the same
+     way. A label without it is measured and drawn exactly as before. */
+
+  var TITLE_FS = 14, TITLE_WEIGHT = 600, TITLE_GAP = 3;
+
+  function titled(label){
+    var parts = String(label == null ? '' : label).split(/<br\s*\/?>|\n/);
+    var m = /^\s*<(b|strong)>([\s\S]*)<\/\1>\s*$/i.exec(decode(parts[0]));
+    var title = m ? m[2].replace(/<[^>]*>/g,'').trim() : '';
+    return title ? { title: title, desc: parts.slice(1).join('<br/>') } : null;
+  }
+  function measureTitled(t, maxw){
+    var head = measure(t.title, TITLE_FS, maxw, TITLE_WEIGHT);
+    var body = splitLabel(t.desc).join('') ? measure(t.desc, NODE_FS, maxw) : null;
+    var gap = body ? TITLE_GAP : 0;
+    return { titled: true, head: head, body: body, gap: gap,
+             lines: head.lines.concat(body ? body.lines : []),
+             w: Math.max(head.w, body ? body.w : 0),
+             h: head.h + gap + (body ? body.h : 0) };
+  }
+  // the label of a box or a group, measured whichever way it is written
+  function measureLabel(label, maxw){
+    var t = titled(label);
+    return t ? measureTitled(t, maxw) : measure(label, NODE_FS, maxw);
+  }
+  // a titled label drawn from its top edge down: the title's lines, the gap,
+  // then the description's, each line centred on its own line height
+  function titledText(m, x, top, anchor, cls){
+    var g = mk('text', { 'text-anchor': anchor }, cls), y = top;
+    [[m.head, 'dg-title'], [m.body, null]].forEach(function(p){
+      if (!p[0]) return;
+      if (p[1] === null) y += m.gap;
+      p[0].lines.forEach(function(line, i){
+        var ts = mk('tspan', { x: x, y: Math.round(y + p[0].lh * (i + .5)) }, p[1]);
+        ts.textContent = line;
+        g.appendChild(ts);
+      });
+      y += p[0].h;
+    });
+    return g;
+  }
+
   /* ------------------------------------------------------------ elk graph */
 
   var NODE_FS = 12.5, EDGE_FS = 11.5;
@@ -580,7 +626,7 @@ export const DIAGRAMS_JS = String.raw`
 
   function nodeSize(n){
     if (n.shape === 'erBox'){ var e = erModel(n); return { w: e.w, h: e.h }; }
-    var m = measure(n.label, NODE_FS, CFG.nodeTextWidth || 210);
+    var m = measureLabel(n.label, CFG.nodeTextWidth || 210);
     n._m = m;
     var w = m.w + PAD_X*2, h = m.h + PAD_Y*2;
     switch (n.shape){
@@ -607,12 +653,12 @@ export const DIAGRAMS_JS = String.raw`
 
     function build(n){
       if (n.isGroup){
-        var gm = measure(n.label, NODE_FS, 320);
+        var gm = measureLabel(n.label, 320);
         n._m = gm;
         return {
           id: n.id, _n: n,
           layoutOptions: {
-            'elk.padding': '[top=' + Math.round(gm.h + 22) + ',left=18,bottom=18,right=18]',
+            'elk.padding': '[top=' + Math.round(gm.h + (gm.titled ? 24 : 22)) + ',left=18,bottom=18,right=18]',
             'elk.direction': DIRS[String(n.dir || '').toUpperCase()] || dir
           },
           children: (kids[n.id] || []).map(build)
@@ -1226,8 +1272,12 @@ export const DIAGRAMS_JS = String.raw`
       if (!n || !n.isGroup) return;
       var g = mk('g', { 'data-group': id }, 'dg-group');
       g.appendChild(mk('rect', { x:a.x, y:a.y, width:a.w, height:a.h, rx:12 }, 'dg-group-shape'));
-      var t = mk('text', { x:a.x+16, y:a.y+18, 'text-anchor':'start' }, 'dg-group-text');
-      t.textContent = n._m.lines.join(' ');
+      var t;
+      if (n._m.titled) t = titledText(n._m, a.x+16, a.y+11, 'start', 'dg-group-text');
+      else {
+        t = mk('text', { x:a.x+16, y:a.y+18, 'text-anchor':'start' }, 'dg-group-text');
+        t.textContent = n._m.lines.join(' ');
+      }
       g.appendChild(t);
       gGroup.appendChild(g);
     });
@@ -1256,7 +1306,9 @@ export const DIAGRAMS_JS = String.raw`
       if (st['stroke-width']) s.style.strokeWidth = st['stroke-width'];
       if (st['stroke-dasharray']) s.style.strokeDasharray = st['stroke-dasharray'];
       g.appendChild(s);
-      var t = textBlock(n._m, a.x + a.w/2, a.y + a.h/2, 'dg-node-text');
+      var t = n._m.titled
+        ? titledText(n._m, a.x + a.w/2, a.y + (a.h - n._m.h)/2, 'middle', 'dg-node-text')
+        : textBlock(n._m, a.x + a.w/2, a.y + a.h/2, 'dg-node-text');
       if (st.color) t.style.fill = st.color;
       g.appendChild(t);
       gNode.appendChild(g);
