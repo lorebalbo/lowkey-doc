@@ -21,7 +21,7 @@ Report back briefly:
   `mermaid: CDN fallback` (the diagram engine could not be cached locally, so the page will need a
   network connection), `elk: unavailable` (flowcharts and ER diagrams will fall back to mermaid's
   layout), or
-  `font: system fallback` (Inter could not be fetched, so the page falls back to a system typeface)
+  `font: system fallback` (Figtree could not be fetched, so the page falls back to a system typeface)
 - `checksum mismatch` anywhere: a download was not the exact file this version pins, so it was
   refused. Say so plainly, and do not try to work around it by fetching the file another way
 
@@ -30,7 +30,7 @@ Do not edit any document as part of this command — it only renders.
 Flags, if asked for:
 
 - `--no-open` build without launching the browser
-- `--refresh` re-download the pinned mermaid bundle, the ELK bundle and the Inter woff2
+- `--refresh` re-download the pinned mermaid bundle, the ELK bundle and the Figtree woff2
 - `--out <dir>` write the dashboard somewhere else
 - `--engine mermaid` fall back to mermaid's own layout everywhere
 - `--watch` serve the dashboard on localhost and update the open page on every save. It keeps

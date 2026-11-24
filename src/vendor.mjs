@@ -29,8 +29,8 @@ import crypto from 'node:crypto';
 // in a year, and a surprise major version should not land in someone's docs.
 export const MERMAID_VERSION = '11.17.2';
 export const ELK_VERSION = '0.12.0';
-// @fontsource-variable/inter, which carries Inter 4.001
-export const INTER_VERSION = '5.3.0';
+// @fontsource-variable/figtree, which carries Figtree from Google Fonts
+export const FIGTREE_VERSION = '5.3.0';
 
 export const NOTICES_FILE = 'THIRD-PARTY-NOTICES.txt';
 
@@ -47,15 +47,15 @@ const ELK = {
   file: 'elk.bundled.js',
   sha384: 'sha384-ww57TDqx4cGknIavPm0QKO+aygLUR1BLSn2Vhbnt1XdYKWcwLyWTFKX7aZMaKIi2',
 };
-// The variable font with both of its axes, optical size and weight. Latin
-// only - the other subsets triple the page for glyphs no doc uses.
-const INTER = [
-  { style: 'normal', sha384: 'sha384-J6qsAXAqf6o0318WxA4xhF/vxuL4NhwP9fFcjHZXsSqdyKns1va+jGgjyn5XiIJL' },
-  { style: 'italic', sha384: 'sha384-wxEgdtMgsytE2z0IplCB84KY2MIh0AXdBHiaX7U1ghRtSnew3nsMP2GBUCzhRCsP' },
+// The variable font, along its weight axis (300 to 900), upright and italic.
+// Latin only - the other subsets add to the page for glyphs no doc uses.
+const FIGTREE = [
+  { style: 'normal', sha384: 'sha384-d6yvnpflv3m5EhqKK5tQtz0HGXMOiCO1F3+L6ha906VSjNeZv+OL3TCteJovhzem' },
+  { style: 'italic', sha384: 'sha384-p1GYfd0e5NwAnc+BewhjJTcrbh2cHlAWFsziN69h/c4trBReafHUHDRx/JIQiBv3' },
 ].map((face) => ({
   ...face,
-  url: CDN + '@fontsource-variable/inter@' + INTER_VERSION + '/files/inter-latin-opsz-' + face.style + '.woff2',
-  file: 'inter-latin-' + face.style + '.woff2',
+  url: CDN + '@fontsource-variable/figtree@' + FIGTREE_VERSION + '/files/figtree-latin-wght-' + face.style + '.woff2',
+  file: 'figtree-latin-' + face.style + '.woff2',
 }));
 
 const NOTICES = [
@@ -71,8 +71,8 @@ const NOTICES = [
     more: 'The source code of elkjs is available under the license below, at the address above.',
   },
   {
-    name: 'Inter 4.001 (@fontsource-variable/inter ' + INTER_VERSION + ')', where: 'inlined in index.html', license: 'inter.txt',
-    source: 'https://github.com/rsms/inter',
+    name: 'Figtree (@fontsource-variable/figtree ' + FIGTREE_VERSION + ')', where: 'inlined in index.html', license: 'figtree.txt',
+    source: 'https://github.com/erikdkennedy/figtree',
   },
 ];
 
@@ -115,22 +115,23 @@ export const vendorMermaid = (outDir, refresh) => vendorScript(MERMAID, outDir, 
 
 export const vendorElk = (outDir, refresh) => vendorScript(ELK, outDir, refresh, true);
 
-// Inter, as a variable font inlined into the page. A file:// origin will not
+// Figtree, as a variable font inlined into the page. A file:// origin will not
 // fetch a font over CORS even from the folder next to it, so the woff2 has to
 // travel as a data: URI, with its license in a comment above it.
 export async function vendorFont(outDir, refresh) {
-  // the stylesheet versions before the font was pinned cached in its place
-  fs.rmSync(path.join(outDir, 'vendor', 'inter.css'), { force: true });
+  // what earlier versions cached in its place: Inter's stylesheet, then its files
+  for (const old of ['inter.css', 'inter-latin-normal.woff2', 'inter-latin-italic.woff2'])
+    fs.rmSync(path.join(outDir, 'vendor', old), { force: true });
   try {
     const faces = [];
     let fetched = false;
-    for (const face of INTER) {
+    for (const face of FIGTREE) {
       const { bytes, fresh } = await pinned(face, outDir, refresh);
       fetched = fetched || fresh;
-      faces.push('@font-face{font-family:Inter;font-weight:100 900;font-display:swap;font-style:' + face.style +
+      faces.push('@font-face{font-family:Figtree;font-weight:300 900;font-display:swap;font-style:' + face.style +
         ';src:url(data:font/woff2;base64,' + bytes.toString('base64') + ') format("woff2")}');
     }
-    const css = '/*! The Inter typeface, inlined below\n\n' + license('inter.txt') + '*/\n' + faces.join('\n');
+    const css = '/*! The Figtree typeface, inlined below\n\n' + license('figtree.txt') + '*/\n' + faces.join('\n');
     return { css, note: fetched ? 'downloaded (' + (Buffer.byteLength(css) / 1024).toFixed(0) + ' KB inlined)' : 'cached' };
   } catch (err) {
     return { css: '', note: 'system fallback (' + err.message + ')' };

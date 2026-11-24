@@ -131,7 +131,7 @@ export const DIAGRAMS_JS = String.raw`
   /* ------------------------------------------------------------ measuring
      Text is measured on a canvas using the page's own resolved font, so a box
      is the size of the words in it. The set is measured again once the webfont
-     has actually loaded: Inter and the fallback are not the same width, and a
+     has actually loaded: Figtree and the fallback are not the same width, and a
      diagram laid out against the wrong one comes out loose. */
 
   var cv = document.createElement('canvas').getContext('2d');

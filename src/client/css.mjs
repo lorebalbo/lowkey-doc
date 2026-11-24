@@ -79,9 +79,9 @@ html{-webkit-text-size-adjust:100%}
   --hover:rgb(var(--wash) / .05);
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --mono:ui-monospace,"JetBrains Mono","Cascadia Mono",SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  /* Inter is vendored into the page as a variable font; everything after it is
-     the offline fallback. Swap this one line to re-face the whole dashboard. */
-  --font:Inter,"Avenir Next","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+  /* Figtree is vendored into the page as a variable font; everything after it
+     is the offline fallback. Swap this one line to re-face the whole dashboard. */
+  --font:Figtree,"Avenir Next","Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
   /* Emphasis is one notch of weight, not two: bold should read as emphasis
      inside the sentence, not as a heavier typeface dropped into it. */
   --semi:560; --bold:620;
@@ -151,7 +151,6 @@ ${LIGHT}
 :root.fixed-margin{--column:clamp(360px,calc(100% - var(--margin) * 2 + var(--gutter) * 2),100%)}
 body{margin:0;background:var(--bg);color:var(--ink);
   font:15px/1.7 var(--font);
-  font-optical-sizing:auto;
   -webkit-font-smoothing:antialiased}
 /* the light the page sits in: one faint glow in the top corner, the theme's
    (--sky). No stars or grain - anything textured behind text is noise the eye

@@ -16,7 +16,7 @@ Lowkey Doc turns a folder of Markdown into one self-contained HTML page. No serv
 | ![The same flowchart in Mermaid's layout, labels piled on top of each other](assets/layout-mermaid.jpg) | ![The same flowchart in Lowkey Doc, every label beside its own arrow](assets/layout-lowkey-doc.jpg) |
 
 > [!NOTE]
-> The first build needs a connection to download Mermaid, ELK and the Inter font. Every build after that works offline.
+> The first build needs a connection to download Mermaid, ELK and the Figtree font. Every build after that works offline.
 
 ## Install
 
