@@ -358,8 +358,8 @@ export const CSS_MAIN = `
     transparent) border-box;background-repeat:no-repeat;animation-duration:19s;animation-delay:-8s}
 @keyframes head-lamp{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.head::before,.head::after{animation:none}}
-.head h1{margin:0;max-width:22ch;font-size:36px;line-height:1.12;font-weight:650;letter-spacing:-.034em;color:var(--ink)}
-.head .lede{margin:14px 0 0;max-width:68ch;font-size:15.5px;line-height:1.62;color:var(--muted)}
+.head h1{margin:0;font-size:36px;line-height:1.12;font-weight:650;letter-spacing:-.034em;color:var(--ink)}
+.head .lede{margin:14px 0 0;font-size:15.5px;line-height:1.62;color:var(--muted)}
 .lede>*{margin:0}
 .lede>*+*{margin-top:10px}
 .doc{padding:4px var(--gutter) 30px;width:100%;max-width:var(--column);margin-inline:auto}
