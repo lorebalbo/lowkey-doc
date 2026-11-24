@@ -1537,7 +1537,9 @@ export const DIAGRAMS_JS = String.raw`
 
   var HOOK = 30, HOOK_STEP = 6, HOOK_RISE = 12;
 
-  function hookAll(list, abs){
+  // force: a side for any end that is not to take the one chosen here, as
+  // { '<edge id>:<0|1>': left } - each item's side records what was taken
+  function hookAll(list, abs, force){
     var groups = {};
     // a route's end at a table, as points from the far end in: the table's end last
     var inward = function(run, atStart){ return atStart ? run.slice().reverse() : run.slice(); };
@@ -1555,7 +1557,8 @@ export const DIAGRAMS_JS = String.raw`
           // Round the side the route comes in from, when it comes from beyond
           // one, so it does not cross over the table; else round the side it
           // drops onto. A straight drop from one table to the other hooks both
-          // ends on the side the two lean to, not one each way.
+          // ends on the side the two lean to, not one each way. That is only
+          // where to start: drawSvg tries the other side too (force).
           var from = null, mid = a.x + a.w / 2, left;
           for (var i = n - 2; i >= 0 && !from; i--) if (Math.abs(pts[i].x - tip.x) > 1) from = pts[i];
           if (from && (from.x < a.x || from.x > a.x + a.w)) left = from.x < a.x;
@@ -1564,16 +1567,32 @@ export const DIAGRAMS_JS = String.raw`
             var b = abs[it.ends[1 - k][0]];
             left = (tip.x - mid) + (b ? tip.x - (b.x + b.w / 2) : 0) < 0;
           }
-          var key = id + (left ? '<' : '>') + face;
+          var fk = it.id + ':' + k;
+          if (force && fk in force) left = force[fk];
+          it.side[k] = left;
+          var key = id + (left ? '<' : '>');
           (groups[key] = groups[key] || []).push({ run: run, atStart: k === 0, a: a, face: face, left: left,
-            rowY: rowY, reach: face < 0 ? rowY - a.y : a.y + a.h - rowY });
+            rowY: rowY, reach: face < 0 ? rowY - a.y : a.y + a.h - rowY,
+            lo: face < 0 ? a.y : rowY, hi: face < 0 ? rowY : a.y + a.h });
         } else if (side && n >= 3 && Math.abs(q.y - tip.y) < 1 && Math.abs(pts[n - 3].x - q.x) < 1){
           q.y = tip.y = rowY;   // the points are the route's own: it slides with them
         }
       });
     });
     Object.keys(groups).forEach(function(key){
-      groups[key].sort(function(u, v){ return u.reach - v.reach; }).forEach(function(h, rank){
+      // The hooks down one side take their places from the table out: those
+      // from the top first, then those from the bottom, each the nearest place
+      // no hook already in it shares any of its length with, so two hooks
+      // never run as one line.
+      var placed = [];
+      groups[key].sort(function(u, v){ return u.face - v.face || u.reach - v.reach; }).forEach(function(h){
+        var rank = 0;
+        while (placed.some(function(o){ return o.rank === rank && h.lo < o.hi + 1 && o.lo < h.hi + 1; })) rank++;
+        h.rank = rank;
+        placed.push(h);
+      });
+      placed.forEach(function(h){
+        var rank = h.rank;
         // taken as the route is now: its other end may have been hooked already
         var pts = inward(h.run, h.atStart), n = pts.length, tip = pts[n - 1], q = pts[n - 2], a = h.a;
         var sx = h.left ? a.x : a.x + a.w;
@@ -1594,6 +1613,348 @@ export const DIAGRAMS_JS = String.raw`
         tail.forEach(function(p){ h.run.push(p); });
       });
     });
+  }
+
+  /* A route as ELK lays it out turns more often than it has to, and more so
+     once its ends are hooked to their rows: it overshoots and comes back, or
+     steps aside and on again, and every turn is a curve the eye has to follow.
+     So each route is pulled tight. A run between two turns is slid sideways
+     until the run before or after it has no length left, which takes out two
+     turns at once - but only where the line still clears every table, every
+     label and every other line, crosses no line it did not cross before, and
+     keeps its label beside it: where it stays, carried along with the run it
+     sits on, or turned to that run's other side. The ends stay where they
+     are, leaving their tables the way they did, with room for their marks. */
+
+  var TIDY_BOX = 10;     // the least clear space between a line and a table it passes
+  var TIDY_END = 30;     // the shortest an end run is let become: its marks, and then a turn
+  var TIDY_NEAR = 4;     // two parallel lines closer than this read as one
+  var TIDY_APART = 14;   // ... and closer than this, for any length, as a double line
+  // What a route costs the eye, in the length of line it is worth: a turn,
+  // and every length run close beside another line. A route is only pulled
+  // tighter where that costs less, so two turns are not traded for a double line.
+  var TURN_COST = 40, NEAR_COST = 1.5;
+
+  function tidyNorm(pts){
+    var out = pts.map(function(p){ return { x: p.x, y: p.y }; }), again = true;
+    while (again){
+      again = false;
+      for (var i = 1; i < out.length; i++){
+        if (Math.abs(out[i].x - out[i-1].x) < .5 && Math.abs(out[i].y - out[i-1].y) < .5){
+          out.splice(i, 1); again = true; break;
+        }
+        if (i < out.length - 1){
+          var a = out[i-1], b = out[i], c = out[i+1];
+          if ((Math.abs(a.x - b.x) < .5 && Math.abs(b.x - c.x) < .5) ||
+              (Math.abs(a.y - b.y) < .5 && Math.abs(b.y - c.y) < .5)){ out.splice(i, 1); again = true; break; }
+        }
+      }
+    }
+    return out;
+  }
+
+  // how much of the run a-b lies inside the rectangle r
+  function insideLen(a, b, r){
+    if (Math.abs(a.y - b.y) < .5){
+      if (a.y <= r.y0 || a.y >= r.y1) return 0;
+      return Math.max(0, Math.min(Math.max(a.x, b.x), r.x1) - Math.max(Math.min(a.x, b.x), r.x0));
+    }
+    if (a.x <= r.x0 || a.x >= r.x1) return 0;
+    return Math.max(0, Math.min(Math.max(a.y, b.y), r.y1) - Math.max(Math.min(a.y, b.y), r.y0));
+  }
+
+  // 1 where a run across and a run down cross inside both, 0 where they only touch
+  function crosses(h, v){
+    var x0 = Math.min(h.a.x, h.b.x), x1 = Math.max(h.a.x, h.b.x);
+    var y0 = Math.min(v.a.y, v.b.y), y1 = Math.max(v.a.y, v.b.y);
+    return v.a.x > x0 + .5 && v.a.x < x1 - .5 && h.a.y > y0 + .5 && h.a.y < y1 - .5 ? 1 : 0;
+  }
+
+  // how far two parallel runs lie along one another, closer than d
+  function alongside(s, o, d){
+    var k = s.h ? 'y' : 'x', l = s.h ? 'x' : 'y';
+    if (Math.abs(s.a[k] - o.a[k]) >= d) return 0;
+    return Math.max(0, Math.min(Math.max(s.a[l], s.b[l]), Math.max(o.a[l], o.b[l])) -
+                       Math.max(Math.min(s.a[l], s.b[l]), Math.min(o.a[l], o.b[l])));
+  }
+
+  function runsOf(pts){
+    var out = [];
+    for (var i = 1; i < pts.length; i++)
+      out.push({ a: pts[i-1], b: pts[i], h: Math.abs(pts[i].y - pts[i-1].y) < .5 });
+    return out;
+  }
+
+  function plateBox(p, pad){
+    return { x0: p.x - p.w/2 - pad, y0: p.y - p.h/2 - pad, x1: p.x + p.w/2 + pad, y1: p.y + p.h/2 + pad };
+  }
+
+  function boxesMeet(r, q){ return r.x0 < q.x1 && q.x0 < r.x1 && r.y0 < q.y1 && q.y0 < r.y1; }
+
+  // routes: [{ id, pts, all, plate, tidy }] - all is every run of a route,
+  // pts the one pulled tight, in place, where tidy is set (a route with more
+  // than one run - folded - only stands in the way); plate is the label's
+  // centre and size, replaced when it moves. The subgraphs in abs are kept
+  // to: a route crosses their borders no more often than it did.
+  function tidyAll(routes, abs, W, H){
+    var boxes = [], borders = [];
+    Object.keys(abs).forEach(function(id){
+      var a = abs[id];
+      if (!a.n) return;
+      if (!a.n.isGroup){
+        boxes.push({ x0: a.x - TIDY_BOX, y0: a.y - TIDY_BOX, x1: a.x + a.w + TIDY_BOX, y1: a.y + a.h + TIDY_BOX });
+        return;
+      }
+      var c = [{ x: a.x, y: a.y }, { x: a.x + a.w, y: a.y }, { x: a.x + a.w, y: a.y + a.h }, { x: a.x, y: a.y + a.h }];
+      borders = borders.concat(runsOf(c.concat([c[0]])));
+    });
+    var trim = function(p, q){
+      var L = Math.hypot(q.x - p.x, q.y - p.y), d = Math.min(L, TIDY_BOX + 1);
+      return L ? { x: p.x + (q.x - p.x) / L * d, y: p.y + (q.y - p.y) / L * d } : p;
+    };
+    var dir = function(a, b){ return { x: Math.sign(Math.round(b.x - a.x)), y: Math.sign(Math.round(b.y - a.y)), l: Math.hypot(b.x - a.x, b.y - a.y) }; };
+    var nearest = function(pts, p){
+      var q = nearestOnPath(pts, p.x, p.y);
+      return q ? Math.hypot(q.x - p.x, q.y - p.y) : 0;
+    };
+    var spanOf = function(list){
+      var b = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      list.forEach(function(s){
+        b.x0 = Math.min(b.x0, s.a.x, s.b.x); b.y0 = Math.min(b.y0, s.a.y, s.b.y);
+        b.x1 = Math.max(b.x1, s.a.x, s.b.x); b.y1 = Math.max(b.y1, s.a.y, s.b.y);
+      });
+      return b;
+    };
+    // touching counts: a run along the edge of the area is still in it
+    var meets = function(r, q){ return r.x0 <= q.x1 && q.x0 <= r.x1 && r.y0 <= q.y1 && q.y0 <= r.y1; };
+
+    // Pulling a route tight only ever moves its runs onto lines it already
+    // spans, so it never leaves the area it covers now. What lies outside
+    // that area - with room for its label to change sides - cannot be met,
+    // and is left out of the reckoning.
+    var around = function(me){
+      var pad = TIDY_APART + 4 + (me.plate ? Math.max(me.plate.w, me.plate.h) + 10 : 0);
+      var b = spanOf(me._runs);
+      b = { x0: b.x0 - pad, y0: b.y0 - pad, x1: b.x1 + pad, y1: b.y1 + pad };
+      var env = { runs: [], boxes: [], plates: [], borders: [] };
+      routes.forEach(function(r){
+        if (r === me) return;
+        if (meets(r._span, b)) r._runs.forEach(function(s){ if (meets(spanOf([s]), b)) env.runs.push(s); });
+        if (r.plate){ var pb = plateBox(r.plate, 3); if (meets(pb, b)) env.plates.push(pb); }
+      });
+      env.boxes = boxes.filter(function(r){ return meets(r, b); });
+      env.borders = borders.filter(function(s){ return meets(spanOf([s]), b); });
+      return env;
+    };
+
+    // what a route and its label cost against everything else: how much of
+    // them lies where it should not, how many lines the route crosses, and
+    // what it costs the eye
+    var cost = function(env, pts, plate){
+      var v = 0, c = 0, near = 0, len = 0, runs = runsOf(pts), n = runs.length;
+      var own = plate ? plateBox(plate, 3) : null;
+      runs.forEach(function(s, k){
+        // an end run leaves its own table: only its part clear of the table is weighed
+        var a = k === 0 ? trim(s.a, s.b) : s.a, b = k === n - 1 ? trim(s.b, s.a) : s.b;
+        env.boxes.forEach(function(r){ v += insideLen(a, b, r); });
+        env.plates.forEach(function(r){ v += insideLen(a, b, r); });
+        if (own) v += insideLen(a, b, own);
+        len += Math.abs(s.b.x - s.a.x) + Math.abs(s.b.y - s.a.y);
+        env.runs.forEach(function(o){
+          if (o.h === s.h){ near += alongside(s, o, TIDY_APART); v += alongside(s, o, TIDY_NEAR); }
+          else c += s.h ? crosses(s, o) : crosses(o, s);
+        });
+        env.borders.forEach(function(o){
+          if (o.h === s.h) v += alongside(s, o, TIDY_NEAR);
+          else c += s.h ? crosses(s, o) : crosses(o, s);
+        });
+      });
+      if (own){
+        env.runs.forEach(function(o){ v += insideLen(o.a, o.b, own); });
+        if (env.boxes.some(function(r){ return boxesMeet(own, { x0: r.x0 + TIDY_BOX - 4, y0: r.y0 + TIDY_BOX - 4,
+                                                              x1: r.x1 - TIDY_BOX + 4, y1: r.y1 - TIDY_BOX + 4 }); })) v += 1e4;
+        if (env.plates.some(function(r){ return boxesMeet(own, r); })) v += 1e4;
+        if (own.x0 < lim.x0 || own.y0 < lim.y0 || own.x1 > lim.x1 || own.y1 > lim.y1) v += 1e4;
+      }
+      return { v: v, c: c, score: TURN_COST * (pts.length - 2) + len + NEAR_COST * near };
+    };
+
+    var pull = function(me){
+      var pts = me.pts, m = pts.length - 1;
+      if (m < 3) return false;
+      var env = around(me), base = cost(env, pts, me.plate), best = null;
+      // the run the label sits beside
+      var at = -1;
+      if (me.plate){
+        var bd = Infinity;
+        for (var s = 0; s < m; s++){
+          var q = nearestOnPath([pts[s], pts[s+1]], me.plate.x, me.plate.y);
+          var d = Math.hypot(q.x - me.plate.x, q.y - me.plate.y);
+          if (d < bd - .01){ bd = d; at = s; }
+        }
+      }
+      for (var i = 1; i <= m - 2; i++){
+        var key = Math.abs(pts[i].y - pts[i+1].y) < .5 ? 'y' : 'x', from = pts[i][key];
+        [i - 1, i + 1].forEach(function(j){
+          if (j < 1 || j > m - 2) return;            // an end run is never taken out
+          var to = (j < i ? pts[j] : pts[j + 1])[key];
+          if (Math.abs(to - from) < .5) return;
+          var np = pts.map(function(p){ return { x: p.x, y: p.y }; });
+          np[i][key] = np[i+1][key] = to;
+          np = tidyNorm(np);
+          if (np.length >= pts.length || np.length < 2) return;
+          // both ends leave their tables as they did, and far enough to take their marks
+          var d0 = dir(np[0], np[1]), d1 = dir(np[np.length-2], np[np.length-1]);
+          if (d0.x !== me.d0.x || d0.y !== me.d0.y || d0.l < Math.min(me.d0.l, TIDY_END) - .5) return;
+          if (d1.x !== me.d1.x || d1.y !== me.d1.y || d1.l < Math.min(me.d1.l, TIDY_END) - .5) return;
+          // the label stays where it is, or goes with the run it sits beside, or to that run's other side
+          var plates = [me.plate];
+          if (me.plate && at === i){
+            var off = me.plate[key] - from, carry = { x: me.plate.x, y: me.plate.y, w: me.plate.w, h: me.plate.h };
+            var turn = { x: me.plate.x, y: me.plate.y, w: me.plate.w, h: me.plate.h };
+            carry[key] = to + off; turn[key] = to - off;
+            plates.push(carry, turn);
+          }
+          plates.forEach(function(pl){
+            if (pl && nearest(np, pl) > me.tie + 2) return;
+            var c = cost(env, np, pl);
+            if (c.c > base.c || c.v > base.v + .5 || c.score > base.score - 1) return;
+            if (!best || c.score < best.score - .5) best = { np: np, pl: pl, score: c.score };
+          });
+        });
+      }
+      if (!best) return false;
+      pts.length = 0;
+      best.np.forEach(function(p){ pts.push(p); });
+      me.plate = best.pl;
+      me._runs = runsOf(pts);
+      me._span = spanOf(me._runs);
+      return true;
+    };
+
+    // a label stays inside the drawing: what ELK laid out, and the hooks beyond it
+    var lim = { x0: 0, y0: 0, x1: W, y1: H };
+    routes.forEach(function(r){ (r.all || [r.pts]).forEach(function(p){ p.forEach(function(q){
+      lim.x0 = Math.min(lim.x0, q.x - 6); lim.y0 = Math.min(lim.y0, q.y - 6);
+      lim.x1 = Math.max(lim.x1, q.x + 6); lim.y1 = Math.max(lim.y1, q.y + 6);
+    }); }); });
+    routes.forEach(function(r){
+      r._runs = [];
+      (r.all || [r.pts]).forEach(function(p){ r._runs = r._runs.concat(runsOf(p)); });
+      r._span = spanOf(r._runs);
+      if (!r.tidy) return;
+      var n = r.pts.length;
+      r.d0 = dir(r.pts[0], r.pts[1]);
+      r.d1 = dir(r.pts[n-2], r.pts[n-1]);
+      r.tie = r.plate ? nearest(r.pts, r.plate) : 0;
+    });
+    // one route pulled tight can free another, so the pass runs until nothing moves
+    for (var round = 0; round < 4; round++){
+      var moved = false;
+      routes.forEach(function(r){
+        if (!r.tidy) return;
+        for (var g = 0; g < 24 && pull(r); g++) moved = true;
+      });
+      if (!moved) break;
+    }
+  }
+
+  /* Where a hook goes round its table is decided from the one end alone, and
+     the side that looks nearer can be the one that leaves the route doubling
+     back under its table, or crossing to the far side of the other. So the
+     relationships are drawn - hooked, then pulled tight - and then drawn again
+     with each end that still turns more than it should hooked round its other
+     side, which is kept whenever the drawing as a whole costs the eye less:
+     its turns, its crossings, its length and its lines run close together.
+     A try pulls tight only the routes it changed; the rest are kept as they
+     were, and once the sides are settled every route is pulled once more. */
+
+  var CROSS_COST = 120, SIDE_TRIES = 24;
+
+  // a route in one run with a run between two turns, which is what can be pulled tight
+  function pullable(runs){ return runs.length === 1 && runs[0].length >= 4; }
+
+  function routeEr(edges, raw, ends, plates, abs, W, H){
+    var copy = function(runs){ return runs.map(function(r){ return r.map(function(p){ return { x: p.x, y: p.y }; }); }); };
+    var sig = function(runs){
+      return runs.map(function(r){ return r.map(function(p){ return Math.round(p.x * 2) + ',' + Math.round(p.y * 2); }).join(' '); }).join('|');
+    };
+    var score = function(routes){
+      var total = 0, turns = {}, crossed = {};
+      routes.forEach(function(r){ crossed[r.id] = 0; });
+      routes.forEach(function(r, i){
+        turns[r.id] = 0;
+        r.all.forEach(function(p){
+          turns[r.id] += Math.max(0, p.length - 2);
+          for (var k = 1; k < p.length; k++) total += Math.abs(p[k].x - p[k-1].x) + Math.abs(p[k].y - p[k-1].y);
+        });
+        total += TURN_COST * turns[r.id];
+        for (var j = i + 1; j < routes.length; j++) r._runs.forEach(function(s){
+          routes[j]._runs.forEach(function(o){
+            if (s.h === o.h){ total += NEAR_COST * alongside(s, o, TIDY_APART); return; }
+            var x = s.h ? crosses(s, o) : crosses(o, s);
+            total += CROSS_COST * x;
+            crossed[r.id] += x; crossed[routes[j].id] += x;
+          });
+        });
+      });
+      return { total: total, turns: turns, crossed: crossed };
+    };
+    var attempt = function(force, prev){
+      var routed = {};
+      edges.forEach(function(e){ routed[e.id] = copy(raw[e.id] || []); });
+      var hooked = ends.map(function(h){ return { id: h.id, runs: routed[h.id], ends: h.ends, side: {} }; });
+      if (hooked.length) hookAll(hooked, abs, force);
+      var byId = {};
+      var routes = edges.filter(function(e){ return routed[e.id].length; }).map(function(e){
+        var runs = routed[e.id], was = prev && prev.byId[e.id], key = sig(runs);
+        var r = { id: e.id, pts: runs[0], all: runs, plate: plates[e.id] || null, tidy: pullable(runs), sig: key };
+        if (was && was.sig === key){
+          // untouched by this try: as it was pulled tight before
+          r.all = copy(was.all); r.pts = r.all[0]; r.plate = was.plate; r.tidy = false;
+        }
+        byId[e.id] = r;
+        return r;
+      });
+      tidyAll(routes, abs, W, H);
+      var sc = score(routes);
+      return { routes: routes, byId: byId, hooked: hooked, force: force, score: sc.total, turns: sc.turns, crossed: sc.crossed };
+    };
+    var best = attempt({}, null), changed = false;
+    // each hooked end round its other side, and both ends of a relationship
+    // together: one link of a chain has to change sides whole, or it only
+    // trades its crossing for a detour
+    var tries = [];
+    best.hooked.forEach(function(h){
+      var keys = [0, 1].filter(function(k){ return k in h.side; }).map(function(k){ return h.id + ':' + k; });
+      keys.forEach(function(key){ tries.push({ id: h.id, keys: [key] }); });
+      if (keys.length === 2) tries.push({ id: h.id, keys: keys });
+    });
+    var sideNow = function(key){
+      var i = key.lastIndexOf(':'), id = key.slice(0, i), k = key.slice(i + 1);
+      return best.hooked.filter(function(h){ return h.id === id; })[0].side[k];
+    };
+    // a route worth another try turns more than an L, or crosses another;
+    // the most tangled first, and no more tries than a large diagram can afford
+    var tangle = function(id){ return Math.max(0, best.turns[id] - 2) + 3 * best.crossed[id]; };
+    tries = tries.filter(function(t){ return tangle(t.id) > 0; });
+    tries.sort(function(a, b){ return tangle(b.id) - tangle(a.id); });
+    tries.slice(0, SIDE_TRIES).forEach(function(t){
+      if (tangle(t.id) <= 0) return;
+      var force = {};
+      for (var k in best.force) force[k] = best.force[k];
+      t.keys.forEach(function(key){ force[key] = !sideNow(key); });
+      var next = attempt(force, best);
+      if (next.score < best.score - 1){ best = next; changed = true; }
+    });
+    if (changed){
+      best.routes.forEach(function(r){ r.tidy = pullable(r.all); });
+      tidyAll(best.routes, abs, W, H);
+    }
+    var routed = {}, out = {};
+    best.routes.forEach(function(r){ routed[r.id] = r.all; if (r.plate) out[r.id] = r.plate; });
+    edges.forEach(function(e){ if (!routed[e.id]) routed[e.id] = []; });
+    return { routed: routed, plates: out, hooked: best.hooked.map(function(h){ return { runs: routed[h.id] }; }) };
   }
 
   function drawSvg(res, data){
@@ -1661,8 +2022,8 @@ export const DIAGRAMS_JS = String.raw`
     // every route first, in root coordinates and the way the source reads it -
     // handed to ELK the other way round, it is turned back, so the start
     // entity's cardinality is still drawn at the start - then hooked to its
-    // rows where ELK could not pin it to them
-    var routed = {}, hooked = [];
+    // rows where ELK could not pin it to them, and pulled tight
+    var routed = {}, hooked = [], ends = [], plates = {};
     (res.edges || []).forEach(function(e){
       var info = e._e || {};
       var src = info.start || (e.sources||[])[0];
@@ -1675,10 +2036,17 @@ export const DIAGRAMS_JS = String.raw`
       if (e._flip) runs = runs.reverse().map(function(r){ return r.reverse(); });
       routed[e.id] = runs;
       if (isEr && data.__hook && info._rows && runs.length)
-        hooked.push({ runs: runs, ends: [[src, info._rows[0]], [dst, info._rows[1]]] });
+        ends.push({ id: e.id, ends: [[src, info._rows[0]], [dst, info._rows[1]]] });
+      // the label's plate: its own size, in the middle of the room ELK kept for it
+      var lb = (e.labels || [])[0];
+      if (lb && info._m) plates[e.id] = { x: lb.x + o.x + lb.width/2, y: lb.y + o.y + lb.height/2,
+                                          w: info._lw || lb.width, h: info._lh || lb.height };
     });
+    if (isEr){
+      var drawn = routeEr(res.edges || [], routed, ends, plates, abs, W, H);
+      routed = drawn.routed; plates = drawn.plates; hooked = drawn.hooked;
+    }
     if (hooked.length){
-      hookAll(hooked, abs);
       // a hook round the widest table runs past the room ELK left round the
       // drawing, so the drawing grows to take it in
       var x0 = 0, y0 = 0, x1 = W, y1 = H, M = 6;
@@ -1701,7 +2069,6 @@ export const DIAGRAMS_JS = String.raw`
       var g = mk('g', { 'data-edge': e.id, 'data-src': src, 'data-dst': dst }, 'dg-el dg-edge');
       var runs = routed[e.id];
       var st = styleOf(info);
-      var o = edgeOrigin(data, abs, src, dst);
       if (!runs.length) return;
       // the rows it joins, lit with it
       var rows = info._rows;
@@ -1752,13 +2119,12 @@ export const DIAGRAMS_JS = String.raw`
       gEdge.appendChild(g);
 
       // the label, and the hairline that ties it to this arc and no other
-      (e.labels || []).forEach(function(lb){
-        var m = info._m;
-        if (!m) return;
+      (e.labels || []).forEach(function(){
+        var m = info._m, pl = plates[e.id];
+        if (!m || !pl) return;
         var pts = runs[Math.floor(runs.length/2)] || runs[0];
         var lg = mk('g', { 'data-edge': e.id, 'data-src': src, 'data-dst': dst }, 'dg-el dg-label');
-        var cx = lb.x + o.x + lb.width/2, cy = lb.y + o.y + lb.height/2;
-        var pw = info._lw || lb.width, ph = info._lh || lb.height;
+        var cx = pl.x, cy = pl.y, pw = pl.w, ph = pl.h;
         var lx = cx - pw/2, ly = cy - ph/2;
         var anchor = pts.length > 1 ? nearestOnPath(roundedPts(pts, BEND_R), cx, cy) : null;
         if (anchor){
