@@ -381,6 +381,7 @@ export const DIAGRAMS_JS = String.raw`
         else desc.push(t);
       });
       n._desc = desc;
+      n._refs = rows.map(function(r){ return r.ref; });
       return { n: n, details: { notes: lists, rows: rows } };
     });
     // A diagram whose comments are all short notes keeps them in its tables.
@@ -406,6 +407,204 @@ export const DIAGRAMS_JS = String.raw`
       if (nullKnown || s.notes.length ||
           s.rows.some(function(r){ return r.desc || r.def || r.ref; })) dr.n._details = s;
     });
+  }
+
+  /* ------------------------------------------------- which columns join
+     A relationship joins two tables through a column on each: the foreign
+     key on one side, and on the other the column it references - nearly
+     always the primary key. Mermaid names only the two entities, so the
+     columns are worked out from what the tables already say, most explicit
+     first: a "%% references" line under a column; a foreign key named after
+     the other table (sender_id, senderId, origin_airport_id); a foreign key
+     named like the other table's own key (dock_code). The relationship then
+     leaves and enters each table on that column's row. Where no foreign key
+     is written, the "one" side of a one-to-many is still joined by its
+     primary key; what cannot be told is drawn to the table, as before.
+
+     e._rows = [row at the start entity, row at the end entity]: a row index,
+     -1 for the header, null for the entity as a whole. */
+
+  var ER_MANY = { zero_or_more: 1, one_or_more: 1 };
+
+  function singular(w){
+    if (/ies$/.test(w)) return w.slice(0, -3) + 'y';
+    if (/(ss|us|is)$/.test(w)) return w;
+    if (/(x|ch|sh|ss|us)es$/.test(w)) return w.slice(0, -2);
+    if (/s$/.test(w)) return w.slice(0, -1);
+    return w;
+  }
+  var flat = function(s){ return s.replace(/[^a-z0-9]/g, ''); };
+  var lastSeg = function(s){ return s.split('.').pop(); };
+
+  // every way a column or a references line may spell this entity's name
+  function erNames(n){
+    var out = {};
+    [n.label, n.alias].forEach(function(s){
+      s = decode(s == null ? '' : String(s)).trim().toLowerCase();
+      if (!s) return;
+      [s, lastSeg(s)].forEach(function(v){
+        [v, singular(v)].forEach(function(w){ if (w){ out[w] = 1; out[flat(w)] = 1; } });
+      });
+    });
+    return out;
+  }
+
+  function erCols(n){
+    return (n.attributes || []).map(function(a, i){
+      return {
+        i: i,
+        name: decode(a.name == null ? '' : a.name).trim().toLowerCase(),
+        keys: (a.keys || []).filter(Boolean).map(function(k){ return String(k).toUpperCase(); }),
+        ref: (n._refs && n._refs[i]) || ''
+      };
+    });
+  }
+  var keyed = function(c, k){ return c.keys.indexOf(k) >= 0; };
+  var colNamed = function(cols, name){
+    for (var i = 0; i < cols.length; i++) if (cols[i].name === name) return cols[i];
+    return null;
+  };
+
+  // A references line that names this entity: the column it names, -1 when
+  // it names only the table, null when it is about another table.
+  function refTarget(ref, n){
+    var r = decode(ref).trim().toLowerCase().replace(/["'\x60]/g, ''), names = n._names, c;
+    if (!r) return null;
+    if (names[r]) return -1;
+    var call = r.match(/^(.*?)\s*\(\s*([^)]+?)\s*\)$/);              // table(column)
+    if (call && (names[call[1]] || names[lastSeg(call[1])]))
+      return (c = colNamed(n._cols, call[2])) ? c.i : -1;
+    var dot = r.lastIndexOf('.');                                    // table.column
+    if (dot > 0){
+      var t = r.slice(0, dot);
+      if ((names[t] || names[lastSeg(t)]) && (c = colNamed(n._cols, r.slice(dot + 1)))) return c.i;
+    }
+    return names[lastSeg(r)] ? -1 : null;                            // schema.table
+  }
+
+  // A column whose name points at the table: sender_id, senderId, sender,
+  // and with a role in front, origin_airport_id. Strict leaves out the role.
+  function namedFor(c, names, strict){
+    var base = c.name.replace(/[_\-\s]*(id|fk|key|ref|code|no|num|uuid|guid)$/, '');
+    if (!base || (base === c.name && strict)) return false;
+    var f = flat(base);
+    if (names[base] || names[f] || names[singular(base)] || names[singular(f)]) return true;
+    if (strict) return false;
+    return Object.keys(names).some(function(k){
+      return k.length >= 3 && f.length > k.length && f.slice(-k.length) === k;
+    });
+  }
+
+  // The column of x that refers to y, most certain first, skipping those
+  // another relationship already joined through: { i, at } where at is the
+  // column of y it names, if it names one.
+  function foreignKey(x, y, taken){
+    var free = x._cols.filter(function(c){
+      if (taken[x.id + ':' + c.i]) return false;
+      // a column that says it references another table is that table's
+      return !c.ref || refTarget(c.ref, y) !== null;
+    });
+    var self = x === y, pk = self ? soloKey(y) : -2;
+    var pick = function(test){
+      for (var i = 0; i < free.length; i++) if (free[i].i !== pk && test(free[i])) return free[i];
+      return null;
+    };
+    var c = pick(function(c){ return c.ref; });
+    if (c) return { i: c.i, at: refTarget(c.ref, y) };
+    c = pick(function(c){ return keyed(c, 'FK') && namedFor(c, y._names, false); }) ||
+        pick(function(c){
+          var twin = colNamed(y._cols, c.name);
+          return keyed(c, 'FK') && twin && !self && (keyed(twin, 'PK') || keyed(twin, 'UK'));
+        }) ||
+        pick(function(c){ return !c.keys.length && namedFor(c, y._names, true); });
+    return c ? { i: c.i, at: -1 } : null;
+  }
+
+  // the entity's primary key, when it is a single column
+  function soloKey(n){
+    var pks = n._cols.filter(function(c){ return keyed(c, 'PK'); });
+    return pks.length === 1 ? pks[0].i : -1;
+  }
+
+  // the column of y a foreign key of x refers to when it does not say
+  function referenced(y, fk){
+    var twin = colNamed(y._cols, fk.name);
+    if (twin && (keyed(twin, 'PK') || keyed(twin, 'UK'))) return twin.i;
+    var pk = soloKey(y);
+    if (pk >= 0) return pk;
+    if (twin) return twin.i;
+    var id = colNamed(y._cols, 'id');
+    return id ? id.i : -1;
+  }
+
+  function erLinks(data){
+    var byId = {}, taken = {};
+    data.nodes.forEach(function(n){
+      if (n.isGroup) return;
+      byId[n.id] = n;
+      n._names = erNames(n);
+      n._cols = erCols(n);
+    });
+    data.edges.forEach(function(e){
+      e._rows = null;
+      var a = byId[e.start], b = byId[e.end];
+      if (!a || !b) return;
+      // the foreign key is looked for first on the side the relationship has as many
+      var aFirst = ER_MANY[e.arrowTypeStart] && !ER_MANY[e.arrowTypeEnd];
+      var tries = aFirst ? [[a, b, 0], [b, a, 1]] : [[b, a, 1], [a, b, 0]];
+      if (a === b) tries = [[a, a, 0]];
+      for (var k = 0; k < tries.length; k++){
+        var x = tries[k][0], y = tries[k][1], fk = foreignKey(x, y, taken);
+        if (!fk) continue;
+        taken[x.id + ':' + fk.i] = 1;
+        var at = fk.at >= 0 ? fk.at : referenced(y, x._cols[fk.i]);
+        // the foreign key takes the end with the many mark; a table joined to
+        // itself has it at the start only when the source puts the many there
+        var fkAtStart = a === b ? !!aFirst : tries[k][2] === 0;
+        e._rows = fkAtStart ? [fk.i, at] : [at, fk.i];
+        return;
+      }
+      if (a === b) return;
+      // none written: the one side of a one-to-many is still joined by its key
+      var pa = soloKey(a), pb = soloKey(b);
+      if (ER_MANY[e.arrowTypeEnd] && !ER_MANY[e.arrowTypeStart] && pa >= 0) e._rows = [pa, -1];
+      else if (ER_MANY[e.arrowTypeStart] && !ER_MANY[e.arrowTypeEnd] && pb >= 0) e._rows = [-1, pb];
+    });
+    data.__linked = data.edges.some(function(e){ return e._rows; });
+    if (data.__linked) orient(data);
+  }
+
+  // A row's port fixes the side a relationship leaves its table by, so ELK
+  // must not turn any relationship round to break a cycle - it would then
+  // leave by the wrong side and loop back round its own table. A relationship
+  // has no direction of its own, so the graph handed to ELK is made acyclic
+  // here: walking it in the order the source writes it, any relationship that
+  // closes a cycle is handed over the other way round (e._flip).
+  function orient(data){
+    var out = {}, state = {};
+    data.edges.forEach(function(e){
+      e._flip = false;
+      if (e.start !== e.end) (out[e.start] = out[e.start] || []).push(e);
+    });
+    var visit = function(id){
+      state[id] = 1;
+      (out[id] || []).forEach(function(e){
+        if (state[e.end] === 1) e._flip = true;
+        else if (!state[e.end]) visit(e.end);
+      });
+      state[id] = 2;
+    };
+    data.nodes.forEach(function(n){ if (!n.isGroup && !state[n.id]) visit(n.id); });
+  }
+
+  // where on its entity a row's relationships meet it, from the top of the box
+  function erRowMid(n, i){
+    var m = erModel(n);
+    if (i < 0 || i >= m.rows.length) return m.headH / 2;
+    if (!m.open) return m.headH + i * ER_ROW_H + ER_ROW_H / 2;
+    var y = m.headH + m.notesH + ER_OPEN_HEAD_H;
+    for (var k = 0; k < i; k++) y += m.rows[k].h;
+    return y + ER_ROW_H / 2;
   }
 
   // Measured once and cached on the node, so the box drawn is the box the
@@ -658,13 +857,47 @@ export const DIAGRAMS_JS = String.raw`
     return { w: Math.round(w), h: Math.round(h) };
   }
 
-  function buildGraph(data, dir, extra){
+  // A flow across meets a table at its sides, so there each relationship is
+  // pinned to its rows by ports: one per entity, row and side, shared by every
+  // relationship that meets the same row on the same side - out of the side
+  // facing the next layer, in by the side facing the last. An entity with any
+  // port has all its relationships pinned, those with no row to its header:
+  // ELK would put a free one anywhere. (A flow down gets no ports: see hookAll.)
+  var SIDE_OUT = { RIGHT: 'EAST', LEFT: 'WEST' }, SIDE_IN = { RIGHT: 'WEST', LEFT: 'EAST' };
+
+  function erPorts(data, dir){
+    var pinned = {}, ports = {}, ends = {};
+    data.edges.forEach(function(e){
+      if (!e._rows) return;
+      if (e._rows[0] !== null) pinned[e.start] = 1;
+      if (e._rows[1] !== null) pinned[e.end] = 1;
+    });
+    data.edges.forEach(function(e){
+      var flip = !!e._flip, ids = [e.start, e.end];
+      ends[e.id] = ids.map(function(id, k){
+        if (!pinned[id]) return id;
+        var row = e._rows && e._rows[k] !== null ? e._rows[k] : -1;
+        // k is the end in the source's terms; out is whether ELK leaves from it.
+        // A table joined to itself loops out and back in on the same side.
+        var out = e.start === e.end || (k === 0) !== flip;
+        var side = (out ? SIDE_OUT : SIDE_IN)[dir];
+        var pid = 'port:' + id + ':' + row + ':' + side;
+        (ports[id] = ports[id] || {})[pid] = { id: pid, row: row, side: side };
+        return pid;
+      });
+    });
+    return { ports: ports, ends: ends };
+  }
+
+  // ports: whether relationships pinned to rows get ports (a flow across only)
+  function buildGraph(data, dir, extra, ports){
     var sp = data.__er ? SPACING.er : SPACING.flow;
     var kids = {};
     data.nodes.forEach(function(n){
       var p = n.parentId || '__root';
       (kids[p] = kids[p] || []).push(n);
     });
+    var pp = data.__linked && ports ? erPorts(data, dir) : null;
 
     function build(n){
       if (n.isGroup){
@@ -680,12 +913,24 @@ export const DIAGRAMS_JS = String.raw`
         };
       }
       var s = nodeSize(n);
-      return { id: n.id, width: s.w, height: s.h, _n: n };
+      var box = { id: n.id, width: s.w, height: s.h, _n: n };
+      var mine = pp && pp.ports[n.id];
+      if (mine){
+        box.layoutOptions = { 'elk.portConstraints': 'FIXED_POS' };
+        box.ports = Object.keys(mine).map(function(pid){
+          var p = mine[pid];
+          return { id: pid, width: 0, height: 0, x: p.side === 'EAST' ? s.w : 0, y: erRowMid(n, p.row),
+                   layoutOptions: { 'elk.port.side': p.side } };
+        });
+      }
+      return box;
     }
 
     var horiz = dir === 'RIGHT' || dir === 'LEFT';
     var edges = data.edges.map(function(e){
-      var ed = { id: e.id, sources: [e.start], targets: [e.end], _e: e };
+      var flip = !!e._flip, at = pp ? pp.ends[e.id] : [e.start, e.end];
+      var ed = { id: e.id, sources: [at[flip ? 1 : 0]], targets: [at[flip ? 0 : 1]], _e: e,
+                 _flip: flip, _ends: flip ? [e.end, e.start] : [e.start, e.end] };
       if (e.label != null && String(e.label).trim() !== ''){
         var m = measure(e.label, EDGE_FS, CFG.edgeTextWidth || 200);
         e._m = m;
@@ -722,9 +967,19 @@ export const DIAGRAMS_JS = String.raw`
         'elk.layered.spacing.edgeEdgeBetweenLayers': sp.edgeEdgeLayer,
         'elk.spacing.edgeLabel': '7',
         'elk.spacing.labelNode': '10',
+        // a table joined to itself: the loop clears the box by enough for the
+        // cardinality marks at both of its ends
+        'elk.spacing.nodeSelfLoop': data.__er ? String(ER_END_CLEAR + 12) : '10',
         'elk.edgeLabels.placement': 'CENTER',
         'elk.padding': '[top='+sp.pad+',left='+sp.pad+',bottom='+sp.pad+',right='+sp.pad+']'
     };
+    // a flow down hooks relationships round the sides of their tables: the
+    // room beside each table, between it and its neighbour or a passing line,
+    // is opened to take the hooks
+    if (data.__linked && !horiz){
+      opts['elk.spacing.nodeNode'] = String(Math.max(Number(sp.node), (HOOK + HOOK_STEP * 2) * 2 + 8));
+      opts['elk.spacing.edgeNode'] = String(Math.max(Number(sp.edgeNode), HOOK + HOOK_STEP * 2 + 10));
+    }
     for (var k in extra || {}) opts[k] = extra[k];
     return { id: 'root', children: (kids.__root || []).map(build), edges: edges, layoutOptions: opts };
   }
@@ -781,8 +1036,9 @@ export const DIAGRAMS_JS = String.raw`
     return (res.edges || []).every(function(e){
       var secs = e.sections || [];
       if (!secs.length) return false;
-      return on(secs[0].startPoint, at[(e.sources || [])[0]]) &&
-             on(secs[secs.length - 1].endPoint, at[(e.targets || [])[0]]);
+      // a relationship pinned to its rows names ports, not entities
+      var ends = e._ends || [(e.sources || [])[0], (e.targets || [])[0]];
+      return on(secs[0].startPoint, at[ends[0]]) && on(secs[secs.length - 1].endPoint, at[ends[1]]);
     });
   }
 
@@ -1027,7 +1283,7 @@ export const DIAGRAMS_JS = String.raw`
 
     m.rows.forEach(function(row, i){
       var top = y + m.headH + i * ER_ROW_H, cy = top + ER_ROW_H/2;
-      var rg = mk('g', null, 'dg-er-row');
+      var rg = mk('g', { 'data-row': i }, 'dg-er-row');
       // what the column holds, shown while the pointer is on its row: the
       // compact table has no room for it (an opened one writes it out)
       var desc = n._details && n._details.rows[i] && n._details.rows[i].desc;
@@ -1096,7 +1352,7 @@ export const DIAGRAMS_JS = String.raw`
     var col = m.col;
     m.rows.forEach(function(row, i){
       var r0 = row.r, cy = top + ER_ROW_H/2;
-      var rg = mk('g', null, 'dg-er-row');
+      var rg = mk('g', { 'data-row': i }, 'dg-er-row');
       var last = i === m.rows.length - 1, rr = r - 1, x1 = x + 1, x2 = x + w - 1, y2 = y + h - 1;
       rg.appendChild(last
         ? mk('path', { d: 'M'+x1+','+top+' H'+x2+' V'+(y2-rr)+' A'+rr+','+rr+' 0 0 1 '+(x2-rr)+','+y2+
@@ -1270,6 +1526,76 @@ export const DIAGRAMS_JS = String.raw`
     return g;
   }
 
+  /* A flow down meets a table at its top or bottom, and a row can only be met
+     from the side. So there a relationship is laid out to the table, and then
+     hooked round to its row: it turns away just short of the table, runs out
+     past the side, alongside the table to the row, and comes in level with it.
+     Several hooks on one side of a table nest - the further its row from where
+     they come in, the further out a hook runs and the earlier it turns - so
+     they do not cross one another. A relationship that ELK already brought to
+     the side (a table joined to itself) just slides along it to the row. */
+
+  var HOOK = 30, HOOK_STEP = 6, HOOK_RISE = 12;
+
+  function hookAll(list, abs){
+    var groups = {};
+    // a route's end at a table, as points from the far end in: the table's end last
+    var inward = function(run, atStart){ return atStart ? run.slice().reverse() : run.slice(); };
+    list.forEach(function(it){
+      [0, 1].forEach(function(k){
+        var id = it.ends[k][0], row = it.ends[k][1], a = abs[id];
+        if (row == null || row < 0 || !a || !a.n || a.n.isGroup) return;
+        var run = k === 0 ? it.runs[0] : it.runs[it.runs.length - 1];
+        if (!run || run.length < 2) return;
+        var pts = inward(run, k === 0), n = pts.length, tip = pts[n - 1], q = pts[n - 2];
+        var rowY = a.y + erRowMid(a.n, row);
+        var face = Math.abs(tip.y - a.y) < 1.5 ? -1 : Math.abs(tip.y - (a.y + a.h)) < 1.5 ? 1 : 0;
+        var side = Math.abs(tip.x - a.x) < 1.5 || Math.abs(tip.x - (a.x + a.w)) < 1.5;
+        if (face && Math.abs(q.x - tip.x) < 1){
+          // Round the side the route comes in from, when it comes from beyond
+          // one, so it does not cross over the table; else round the side it
+          // drops onto. A straight drop from one table to the other hooks both
+          // ends on the side the two lean to, not one each way.
+          var from = null, mid = a.x + a.w / 2, left;
+          for (var i = n - 2; i >= 0 && !from; i--) if (Math.abs(pts[i].x - tip.x) > 1) from = pts[i];
+          if (from && (from.x < a.x || from.x > a.x + a.w)) left = from.x < a.x;
+          else if (from) left = tip.x < mid;
+          else {
+            var b = abs[it.ends[1 - k][0]];
+            left = (tip.x - mid) + (b ? tip.x - (b.x + b.w / 2) : 0) < 0;
+          }
+          var key = id + (left ? '<' : '>') + face;
+          (groups[key] = groups[key] || []).push({ run: run, atStart: k === 0, a: a, face: face, left: left,
+            rowY: rowY, reach: face < 0 ? rowY - a.y : a.y + a.h - rowY });
+        } else if (side && n >= 3 && Math.abs(q.y - tip.y) < 1 && Math.abs(pts[n - 3].x - q.x) < 1){
+          q.y = tip.y = rowY;   // the points are the route's own: it slides with them
+        }
+      });
+    });
+    Object.keys(groups).forEach(function(key){
+      groups[key].sort(function(u, v){ return u.reach - v.reach; }).forEach(function(h, rank){
+        // taken as the route is now: its other end may have been hooked already
+        var pts = inward(h.run, h.atStart), n = pts.length, tip = pts[n - 1], q = pts[n - 2], a = h.a;
+        var sx = h.left ? a.x : a.x + a.w;
+        var xs = sx + (h.left ? -1 : 1) * (HOOK + rank * HOOK_STEP);
+        var yh = tip.y + h.face * (HOOK_RISE + rank * HOOK_STEP), tail;
+        if (n >= 3 && (h.face < 0 ? q.y >= yh - .5 : q.y <= yh + .5)){
+          // the route already turns nearer the table than that: the hook leaves from its turn
+          yh = q.y;
+          tail = pts.slice(0, n - 2);
+        } else {
+          if (n < 3 && (h.face < 0 ? q.y >= yh : q.y <= yh)) yh = (q.y + tip.y) / 2;
+          tail = pts.slice(0, n - 1);
+          tail.push({ x: tip.x, y: yh });
+        }
+        tail.push({ x: xs, y: yh }, { x: xs, y: h.rowY }, { x: sx, y: h.rowY });
+        if (h.atStart) tail.reverse();
+        h.run.length = 0;
+        tail.forEach(function(p){ h.run.push(p); });
+      });
+    });
+  }
+
   function drawSvg(res, data){
     var isEr = !!data.__er;
     var abs = absolutise(res);
@@ -1332,20 +1658,57 @@ export const DIAGRAMS_JS = String.raw`
       gNode.appendChild(g);
     });
 
+    // every route first, in root coordinates and the way the source reads it -
+    // handed to ELK the other way round, it is turned back, so the start
+    // entity's cardinality is still drawn at the start - then hooked to its
+    // rows where ELK could not pin it to them
+    var routed = {}, hooked = [];
+    (res.edges || []).forEach(function(e){
+      var info = e._e || {};
+      var src = info.start || (e.sources||[])[0];
+      var dst = info.end || (e.targets||[])[0];
+      var o = edgeOrigin(data, abs, src, dst);
+      var shift = function(p){ return { x: p.x + o.x, y: p.y + o.y }; };
+      var runs = (e.sections || []).map(function(sec){
+        return [sec.startPoint].concat(sec.bendPoints || [], [sec.endPoint]).map(shift);
+      });
+      if (e._flip) runs = runs.reverse().map(function(r){ return r.reverse(); });
+      routed[e.id] = runs;
+      if (isEr && data.__hook && info._rows && runs.length)
+        hooked.push({ runs: runs, ends: [[src, info._rows[0]], [dst, info._rows[1]]] });
+    });
+    if (hooked.length){
+      hookAll(hooked, abs);
+      // a hook round the widest table runs past the room ELK left round the
+      // drawing, so the drawing grows to take it in
+      var x0 = 0, y0 = 0, x1 = W, y1 = H, M = 6;
+      hooked.forEach(function(it){ it.runs.forEach(function(r){ r.forEach(function(p){
+        x0 = Math.min(x0, p.x - M); y0 = Math.min(y0, p.y - M);
+        x1 = Math.max(x1, p.x + M); y1 = Math.max(y1, p.y + M);
+      }); }); });
+      if (x0 < 0 || y0 < 0 || x1 > W || y1 > H){
+        x0 = Math.floor(x0); y0 = Math.floor(y0); x1 = Math.ceil(x1); y1 = Math.ceil(y1);
+        svg.setAttribute('viewBox', x0 + ' ' + y0 + ' ' + (x1 - x0) + ' ' + (y1 - y0));
+        svg.setAttribute('width', x1 - x0);
+        svg.setAttribute('height', y1 - y0);
+      }
+    }
+
     (res.edges || []).forEach(function(e){
       var info = e._e || {};
       var src = info.start || (e.sources||[])[0];
       var dst = info.end || (e.targets||[])[0];
       var g = mk('g', { 'data-edge': e.id, 'data-src': src, 'data-dst': dst }, 'dg-el dg-edge');
-      var runs = [];
+      var runs = routed[e.id];
       var st = styleOf(info);
       var o = edgeOrigin(data, abs, src, dst);
-      var shift = function(p){ return { x: p.x + o.x, y: p.y + o.y }; };
-
-      (e.sections || []).forEach(function(sec){
-        runs.push([sec.startPoint].concat(sec.bendPoints || [], [sec.endPoint]).map(shift));
-      });
       if (!runs.length) return;
+      // the rows it joins, lit with it
+      var rows = info._rows;
+      if (isEr && rows){
+        if (rows[0] !== null && rows[0] >= 0) g.setAttribute('data-src-row', rows[0]);
+        if (rows[1] !== null && rows[1] >= 0) g.setAttribute('data-dst-row', rows[1]);
+      }
       // both ends on the shape itself, not on the box ELK knows it by
       if (!isEr){
         var first = runs[0], last = runs[runs.length-1];
@@ -2176,6 +2539,20 @@ export const DIAGRAMS_JS = String.raw`
            mermaid.mermaidAPI && typeof mermaid.mermaidAPI.getDiagramFromText === 'function';
   }
 
+  // One shape laid out. A flow across pins relationships to their rows with
+  // ports; if ELK cannot place them, or the flow runs down, the relationships
+  // are laid out to the tables and hooked round to their rows when drawn.
+  function layoutShape(data, sh){
+    var plain = function(){
+      return elk.layout(buildGraph(data, sh.dir, sh.extra, false)).then(function(res){
+        res.__hook = !!data.__linked;
+        return res;
+      });
+    };
+    if (!data.__linked || !(sh.dir === 'RIGHT' || sh.dir === 'LEFT')) return plain();
+    return elk.layout(buildGraph(data, sh.dir, sh.extra, true)).catch(plain);
+  }
+
   function renderClean(fig, code, kind){
     if (!initMermaid()) return Promise.reject(new Error('mermaid unavailable'));
     if (kind === 'sequence') return renderSequence(fig, code);
@@ -2191,6 +2568,7 @@ export const DIAGRAMS_JS = String.raw`
       data.__er = kind === 'er';
       if (data.__er){
         attachDetails(data, code);
+        erLinks(data);
         var open = fig._open || {};
         // the width an opened entity can take without widening the diagram past the page
         var room = fig.querySelector('.diagram-out').clientWidth;
@@ -2204,9 +2582,9 @@ export const DIAGRAMS_JS = String.raw`
       var dir = DIRS[String(raw).toUpperCase()] || 'DOWN';
       var avail = fig.querySelector('.diagram-out').clientWidth;
       var shape = { dir: dir, extra: null };
-      var layout = function(){ return elk.layout(buildGraph(data, shape.dir, shape.extra)); };
+      var layout = function(){ return layoutShape(data, shape); };
       var first = !data.__er || !avail ? layout() : Promise.all(erShapes(code, dir, avail).map(function(sh){
-        return elk.layout(buildGraph(data, sh.dir, sh.extra)).then(function(res){
+        return layoutShape(data, sh).then(function(res){
           return { dir: sh.dir, extra: sh.extra, res: res };
         }, function(){ return null; });
       })).then(function(tries){
@@ -2227,6 +2605,7 @@ export const DIAGRAMS_JS = String.raw`
       }).then(function(res){
         var out = fig.querySelector('.diagram-out');
         out.textContent = '';
+        data.__hook = !!res.__hook;
         out.appendChild(drawSvg(res, data));
         // the shape was chosen for this width: another width may want another
         if (data.__er){ fig._seqWidth = avail; refitOnResize(fig, out); }
@@ -2355,9 +2734,10 @@ export const DIAGRAMS_JS = String.raw`
 
   function clear(svg){
     svg.classList.remove('has-hot');
-    [].slice.call(svg.querySelectorAll('.is-hot,.is-near')).forEach(function(n){
+    [].slice.call(svg.querySelectorAll('.is-hot,.is-near,.is-linked')).forEach(function(n){
       n.classList.remove('is-hot');
       n.classList.remove('is-near');
+      n.classList.remove('is-linked');
     });
     mirror(svg);
   }
@@ -2374,6 +2754,16 @@ export const DIAGRAMS_JS = String.raw`
     });
   }
 
+  // the two columns a lit relationship joins, lit in their tables
+  function linkRows(svg, edge){
+    [['src', 'srcRow'], ['dst', 'dstRow']].forEach(function(k){
+      var r = edge.dataset[k[1]];
+      if (r == null) return;
+      var row = svg.querySelector('.dg-node[data-node="' + sel(edge.dataset[k[0]]) + '"] .dg-er-row[data-row="' + r + '"]');
+      if (row) row.classList.add('is-linked');
+    });
+  }
+
   function light(svg, kind, id){
     clear(svg);
     svg.classList.add('has-hot');
@@ -2382,6 +2772,7 @@ export const DIAGRAMS_JS = String.raw`
       [].slice.call(svg.querySelectorAll('[data-edge="' + sel(id) + '"]')).forEach(function(n){
         n.classList.add('is-hot');
         ends[n.dataset.src] = 1; ends[n.dataset.dst] = 1;
+        linkRows(svg, n);
       });
       Object.keys(ends).forEach(function(nid){
         var n = svg.querySelector('.dg-node[data-node="' + sel(nid) + '"]');
@@ -2395,6 +2786,7 @@ export const DIAGRAMS_JS = String.raw`
     [].slice.call(svg.querySelectorAll('.dg-edge,.dg-label')).forEach(function(n){
       if (n.dataset.src !== id && n.dataset.dst !== id) return;
       n.classList.add('is-hot');
+      linkRows(svg, n);
       near[n.dataset.src === id ? n.dataset.dst : n.dataset.src] = 1;
     });
     Object.keys(near).forEach(function(nid){

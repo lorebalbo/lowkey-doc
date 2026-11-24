@@ -55,6 +55,9 @@ For an `erDiagram`, the entity is drawn as a table with the keys pinned to its r
   for one about what is stored.
 - **Mark the keys** as mermaid spells them — `PK`, `FK`, `UK`, comma-separated for more than one
   (`uuid parcel_id PK,FK`) — and quote a comment: `string note "free text"`.
+- **Let the foreign key say what it joins.** A relationship is drawn from the foreign key's row to
+  the row of the key it points at, so name it after the table (`sender_id`, `origin_airport_id`)
+  or, when the name cannot say it, write `%% references dock.dock_code` on the line under it.
 - **Name the role in the reader's words.** `VOYAGE ||--o{ STOWAGE : carries` reads;
   `: fk_stowage_voyage` does not.
 

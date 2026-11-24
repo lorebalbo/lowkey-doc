@@ -790,6 +790,10 @@ svg.dg .dg-el.is-hot,svg.dg .dg-el.is-near{opacity:1}
    from the type on the left across to the keys on the right */
 .dg-er-band{fill:transparent;transition:fill .12s ease}
 .dg-er-row:hover .dg-er-band{fill:var(--dg-er-hover)}
+/* the columns a lit relationship joins: lit with it, so which field it meets
+   reads without following the line to its end */
+.dg-er-row.is-linked .dg-er-band{fill:var(--dg-er-hover)}
+.dg-er-row.is-linked .dg-er-name{fill:var(--dg-hot)}
 
 /* crow's feet: line-drawn like the arrowheads, and lit by the same rules, so a
    relationship and both of its cardinalities light as one thing */
